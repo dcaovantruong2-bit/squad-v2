@@ -1,7 +1,6 @@
 import { writable, derived } from 'svelte/store';
-import { createGameState, autoFillSquad, autoRecommendFormation, calculateChips, getPositionPenalty } from './engine/engine.js';
+import { createGameState, autoFillSquad, autoRecommendFormation, calculateChips, getPositionPenalty, dealPhases } from './engine/engine.js';
 import { PLAYERS, FORMATIONS, CAMPAIGN_MATCHES, POSITION_ADJACENCY } from './engine/data.js';
-
 // ─── Current screen ───────────────────────────────────────────────────────────
 export const screen = writable('title');
 // screens: 'title' | 'squad' | 'phases' | 'match' | 'phase-result'
@@ -52,11 +51,13 @@ export function startNewGame() {
 }
 
 export function quickStart() {
-  const formation = '4-4-2';
-  const ids = autoFillSquad(formation);
-  const rec = autoRecommendFormation(ids);
-  game.update(g => ({ ...g, selectedIds: ids, formation: rec || formation }));
-  screen.set('phases');
+  game.update(g => {
+    const ids = autoFillSquad('4-4-2');
+    const rec = autoRecommendFormation(ids);
+    return { ...g, selectedIds: ids, formation: rec || '4-4-2' };
+  });
+  autoFillFormation();
+  confirmSquad();
 }
 
 // ─── Squad builder: formation + slot assignment ───────────────────────────────
@@ -220,7 +221,7 @@ export function confirmSquad() {
     });
     return { ...g, selectedIds: ids, field };
   });
-  screen.set('phases');
+  startPhaseSelection();
 }
 
 // Legacy helpers kept for compatibility with other screens
@@ -241,4 +242,41 @@ export function removePlayer(playerId) {
 
 export function setFormation(formationId) {
   game.update(g => ({ ...g, formation: formationId }));
+}
+
+// ─── Phase selection ──────────────────────────────────────────────────────────
+
+// Enter the phases screen: deal this round's phases (5, pick 3).
+export function startPhaseSelection() {
+  game.update(g => ({
+    ...g,
+    dealtPhases: dealPhases(),
+    pickedPhases: [],
+  }));
+  screen.set('phases');
+}
+
+// Append a phase to the sequence (max 3). Tapping a card fills the next
+// empty slot — pick order matters because combo chains fire between
+// consecutive picks.
+export function pickPhase(phaseId) {
+  game.update(g => {
+    if ((g.pickedPhases || []).length >= 3) return g;
+    if (g.pickedPhases.includes(phaseId)) return g;
+    return { ...g, pickedPhases: [...g.pickedPhases, phaseId] };
+  });
+}
+
+// Remove a phase from the sequence at a given slot (tap the filled slot).
+export function unpickPhase(slotIndex) {
+  game.update(g => {
+    const picked = [...(g.pickedPhases || [])];
+    if (slotIndex < 0 || slotIndex >= picked.length) return g;
+    picked.splice(slotIndex, 1);
+    return { ...g, pickedPhases: picked };
+  });
+}
+
+export function confirmPhases() {
+  screen.set('match');
 }

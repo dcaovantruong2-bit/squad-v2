@@ -360,10 +360,22 @@ export function detectSquadSynergies(squad) {
 
 // ─── OPPONENT TACTICS ─────────────────────────────────────────────────────────
 
-function getOpponentTactics(state) {
+export function getOpponentTactics(state) {
   const match = CAMPAIGN_MATCHES[state.matchIdx];
   if (!match || !match.tactics) return [];
   return match.tactics.map(tid => OPPONENT_TACTICS[tid]).filter(Boolean);
+}
+
+// Phase tags the opponent punishes (partial reveal): the UI warns with a ⚠
+// badge on affected phase cards, but the exact multiplier stays hidden.
+export function getPunishedTags(state) {
+  const tags = new Set();
+  for (const tac of getOpponentTactics(state)) {
+    if (tac.target === 'phaseTag' && tac.tags) {
+      tac.tags.forEach(t => tags.add(t));
+    }
+  }
+  return [...tags];
 }
 
 function getOpponentTacticalMultiplier(phaseId, field, state) {
@@ -409,16 +421,30 @@ function getPhaseChainBonusChips(phaseId, pickedPhases) {
 
 // ─── FULL PHASE SCORING PIPELINE ─────────────────────────────────────────────
 
+// A field entry participates in a phase if its position is referenced by the
+// phase's slots. Slots entries may be a single position ("CB") or an array of
+// alternatives (direct_play's [["LW","RW"],"ST","CM"] — either winger counts).
+// Phase scoring is gated by these slots: a phase only counts the players in
+// its positions, so squad composition decides which phases score well.
+export function phaseIncludesPosition(phase, position) {
+  if (!phase || !phase.slots) return true; // safety: no phase → everyone counts
+  return phase.slots.some(s =>
+    Array.isArray(s) ? s.includes(position) : s === position
+  );
+}
+
 export function calculatePhaseScore(field, phaseId, state) {
   if (!field || field.length === 0) return { score: 0, breakdown: [], synergies: [] };
 
   const match = CAMPAIGN_MATCHES[state.matchIdx];
   const roundTarget = match ? match.targets[state.roundIdx] : 1000;
+  const phase = ALL_PHASES.find(p => p.id === phaseId);
 
-  // Base player chips
+  // Base player chips — only players in the phase's slots contribute.
   let playerChips = 0;
   const breakdown = [];
   for (const entry of field) {
+    if (!phaseIncludesPosition(phase, entry.position)) continue;
     const { player, position } = entry;
     const baseChips = calculateChips(player, position);
     const oopMult = getPositionPenalty(player, position);
@@ -497,6 +523,49 @@ export function calculatePhaseScore(field, phaseId, state) {
     momentum,
     tacMult,
   };
+}
+
+// Raw additive chips a phase produces with this squad — BEFORE all multipliers
+// (addMult, xMult, momentum, phaseMult, tacMult) and without chain bonus chips
+// (those belong to the sequence arrows, not the card). Safe to show during
+// phase selection: it never leaks the hidden opponent multiplier.
+// Player chips are gated by the phase's slots (same as calculatePhaseScore);
+// synergies stay squad-wide, so the estimate matches the real score.
+export function estimatePhaseChips(field, phaseId, state) {
+  if (!field || field.length === 0) return 0;
+
+  const phase = ALL_PHASES.find(p => p.id === phaseId);
+  let chips = 0;
+  for (const entry of field) {
+    if (!phaseIncludesPosition(phase, entry.position)) continue;
+    const { player, position } = entry;
+    const base = calculateChips(player, position);
+    const oop = getPositionPenalty(player, position);
+    const eng = getEnergyMultiplier(player.id, state);
+    chips += Math.round(base * oop * eng);
+  }
+
+  for (const syn of detectSynergies(field, state.formation)) {
+    chips += syn.chips || 0;
+  }
+
+  for (const ssyn of detectSquadSynergies(getSquad(state))) {
+    const eff = ssyn.effect;
+    if (!eff.addChips) continue;
+    if (eff.target === 'all') chips += eff.addChips;
+    if (eff.targetPositions) {
+      for (const entry of field) {
+        if (eff.targetPositions.includes(entry.position)) chips += eff.addChips;
+      }
+    }
+  }
+
+  for (const buff of (state.shopBuffs || [])) {
+    if (buff.type === 'chipsBuff') chips += buff.value;
+  }
+
+  chips += state._carryoverChips || 0;
+  return Math.round(chips);
 }
 
 // ─── CAMPAIGN ─────────────────────────────────────────────────────────────────
@@ -628,15 +697,16 @@ export function buyShopItem(itemId, state) {
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
-export function dealPhases() {
+export function dealPhases(count = 5) {
   const ids = ALL_PHASES.map(p => p.id);
-  // Fisher-Yates shuffle, return 8 (all phases in random order)
+  // Fisher-Yates shuffle, return `count` phases (default 5, pick 3)
+  // Scout Report (shop item) will call dealPhases(8) to reveal all.
   const arr = [...ids];
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
-  return arr.slice(0, 8);
+  return arr.slice(0, count);
 }
 
 export function evaluateComboChains(pickedPhases) {

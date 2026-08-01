@@ -2,12 +2,15 @@
   import { screen } from './lib/store.js';
   import TitleScreen    from './lib/screens/TitleScreen.svelte';
   import SquadBuilder   from './lib/screens/SquadBuilder.svelte';
+  import PhaseSelection from './lib/screens/PhaseSelection.svelte';
 </script>
 
 {#if $screen === 'title'}
   <TitleScreen />
 {:else if $screen === 'squad'}
   <SquadBuilder />
+{:else if $screen === 'phases'}
+  <PhaseSelection />
 {:else}
   <!-- Placeholder for future screens -->
   <div class="screen" style="justify-content:center;align-items:center;gap:16px;">
