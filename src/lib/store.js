@@ -2,7 +2,7 @@ import { writable, derived } from 'svelte/store';
 import {
   createGameState, autoFillSquad, autoRecommendFormation, calculateChips,
   getPositionPenalty, dealPhases, resolveCurrentPhase, finishRound,
-  finishMatch, resetRound, buyShopItem,
+  finishMatch, resetRound, buyShopItem, swapFieldEntries,
 } from './engine/engine.js';
 import { PLAYERS, FORMATIONS, CAMPAIGN_MATCHES, POSITION_ADJACENCY } from './engine/data.js';
 import { sfx } from './sfx.js';
@@ -295,6 +295,20 @@ export function confirmPhases() {
   sfx.kickoff();
   game.update(g => ({ ...g, phaseIdx: 0, phaseResults: [], roundScore: 0 }));
   screen.set('match');
+}
+
+// Match-time lineup: swap which of the 11 fills a slot (positions stay tied to
+// their slots, so the swap is a pure permutation — the XI always stays complete).
+export function swapFieldPlayer(slotIndex, playerId) {
+  sfx.pick();
+  game.update(g => {
+    const field = g.field || [];
+    const slot = field[slotIndex];
+    if (!slot) return g;
+    const fromIdx = field.findIndex(e => e.player.id === playerId);
+    if (fromIdx === -1 || fromIdx === slotIndex) return g;
+    return { ...g, field: swapFieldEntries(field, slotIndex, fromIdx) };
+  });
 }
 
 export function playCurrentPhase() {

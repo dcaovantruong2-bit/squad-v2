@@ -436,6 +436,33 @@ export function phaseIncludesPosition(phase, position) {
   );
 }
 
+// ─── MATCH-TIME LINEUP ─────────────────────────────────────────────────────────
+
+// Per-player contribution to a phase if placed in a given slot position.
+// Returns 0 when the slot's position isn't in the phase's slots — a tired
+// player parked there scores nothing but also doesn't drain energy (rest slot).
+export function playerPhaseContribution(player, slotPosition, phaseId, state) {
+  if (!player || !slotPosition) return 0;
+  const phase = ALL_PHASES.find(p => p.id === phaseId);
+  if (!phaseIncludesPosition(phase, slotPosition)) return 0;
+  const baseChips = calculateChips(player, slotPosition);
+  const oopMult = getPositionPenalty(player, slotPosition);
+  const energyMult = getEnergyMultiplier(player.id, state);
+  return Math.round(baseChips * oopMult * energyMult);
+}
+
+// Swap which players fill two slots (positions stay tied to their slots).
+// Pure permutation — the XI always stays complete, no duplicates.
+export function swapFieldEntries(field, fromIdx, toIdx) {
+  if (!field || fromIdx === toIdx) return field;
+  if (fromIdx < 0 || toIdx < 0 || fromIdx >= field.length || toIdx >= field.length) return field;
+  const next = field.map(e => ({ player: e.player, position: e.position }));
+  const a = next[fromIdx];
+  next[fromIdx] = { player: next[toIdx].player, position: a.position };
+  next[toIdx] = { player: a.player, position: next[toIdx].position };
+  return next;
+}
+
 export function calculatePhaseScore(field, phaseId, state) {
   if (!field || field.length === 0) return { score: 0, breakdown: [], synergies: [] };
 

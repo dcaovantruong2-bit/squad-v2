@@ -6,6 +6,11 @@ import {
   resetRound,
   finishRound,
   finishMatch,
+  playerPhaseContribution,
+  swapFieldEntries,
+  calculateChips,
+  getPositionPenalty,
+  getEnergyMultiplier,
 } from '../src/lib/engine/engine.js';
 import { PLAYERS, FORMATIONS } from '../src/lib/engine/data.js';
 
@@ -23,6 +28,36 @@ function playableState() {
     pickedPhases: ['goal_kick', 'build_up', 'wide_attack'],
   };
 }
+
+test('playerPhaseContribution counts slot positions and zeroes rest slots', () => {
+  const state = playableState();
+  const gkSlot = state.field[0]; // GK slot — goal_kick counts GK
+  const cmSlot = state.field.find(e => e.position === 'CM');
+  const expected = Math.round(
+    calculateChips(gkSlot.player, gkSlot.position) *
+    getPositionPenalty(gkSlot.player, gkSlot.position) *
+    getEnergyMultiplier(gkSlot.player.id, state)
+  );
+  assert.equal(playerPhaseContribution(gkSlot.player, gkSlot.position, 'goal_kick', state), expected);
+  // A CM doesn't count in goal_kick (GK/CB only) — that slot is a rest opportunity.
+  assert.equal(playerPhaseContribution(cmSlot.player, cmSlot.position, 'goal_kick', state), 0);
+});
+
+test('swapFieldEntries is a pure permutation — XI stays complete, positions stay with slots', () => {
+  const field = playableState().field;
+  const swapped = swapFieldEntries(field, 0, 5);
+  assert.equal(swapped.length, 11);
+  assert.equal(swapped[0].player.id, field[5].player.id);
+  assert.equal(swapped[5].player.id, field[0].player.id);
+  assert.equal(swapped[0].position, field[0].position); // slot 0 keeps its position
+  assert.equal(swapped[5].position, field[5].position);
+  assert.equal(new Set(swapped.map(e => e.player.id)).size, 11); // no duplicates
+  // Original is untouched
+  assert.equal(field[0].player.id, playableState().field[0].player.id);
+  // No-op cases
+  assert.equal(swapFieldEntries(field, 2, 2), field);
+  assert.equal(swapFieldEntries(field, 0, 99), field);
+});
 
 test('resolveCurrentPhase resolves the selected phase without mutating the three-phase plan', () => {
   const state = playableState();

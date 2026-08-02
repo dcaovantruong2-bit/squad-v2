@@ -72,6 +72,8 @@
   }
   .sound-toggle:hover { border-color: #6b7c71; }
   .sound-toggle.muted { opacity: 0.55; }
+  /* Hide the toggle while the lineup sheet is open so it doesn't float over it. */
+  .route-view:has(:global(.swap-sheet)) + .sound-toggle { display: none; }
   /* On campaign end screens there is no fixed footer — tuck into the top corner. */
   .route-view:has(:global(.end-shell)) + .sound-toggle { bottom: auto; top: 14px; right: 14px; }
   @media (max-width: 760px) {
