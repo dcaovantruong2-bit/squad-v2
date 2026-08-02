@@ -27,8 +27,9 @@ export function createGameState() {
     roundResults: [],
     matchResults: [],
     energy: {},
-    morale: 5,
+    morale: 10,
     shopBuffs: [],
+    purchasedItems: [],
     momentum: 1.0,
     campaignWon: false,
     campaignLost: false,
@@ -394,9 +395,10 @@ function getOpponentTacticalMultiplier(phaseId, field, state) {
 
 // ─── COMBO CHAINS / PHASE MULT ────────────────────────────────────────────────
 
-function getPhaseMult(phaseId, pickedPhases) {
-  if (pickedPhases.length === 0) return 1.0;
-  const prevPhaseId = pickedPhases[pickedPhases.length - 1];
+function getPhaseMult(phaseId, pickedPhases, phaseIndex = null) {
+  const idx = phaseIndex === null ? pickedPhases.indexOf(phaseId) : phaseIndex;
+  if (idx <= 0) return 1.0;
+  const prevPhaseId = pickedPhases[idx - 1];
   const prevPhase = ALL_PHASES.find(p => p.id === prevPhaseId);
   const currPhase = ALL_PHASES.find(p => p.id === phaseId);
   if (!prevPhase || !currPhase) return COMBO_NO_MATCH_PENALTY;
@@ -407,9 +409,10 @@ function getPhaseMult(phaseId, pickedPhases) {
   return 1.0;
 }
 
-function getPhaseChainBonusChips(phaseId, pickedPhases) {
-  if (pickedPhases.length === 0) return 0;
-  const prevPhaseId = pickedPhases[pickedPhases.length - 1];
+function getPhaseChainBonusChips(phaseId, pickedPhases, phaseIndex = null) {
+  const idx = phaseIndex === null ? pickedPhases.indexOf(phaseId) : phaseIndex;
+  if (idx <= 0) return 0;
+  const prevPhaseId = pickedPhases[idx - 1];
   const prevPhase = ALL_PHASES.find(p => p.id === prevPhaseId);
   const currPhase = ALL_PHASES.find(p => p.id === phaseId);
   if (!prevPhase || !currPhase) return 0;
@@ -488,17 +491,21 @@ export function calculatePhaseScore(field, phaseId, state) {
   // Shop buffs
   let shopChipsBuff = 0;
   let shopAddMultBuff = 0;
+  let shopXMultBuff = 1.0;
   for (const buff of (state.shopBuffs || [])) {
     if (buff.type === 'chipsBuff') shopChipsBuff += buff.value;
     if (buff.type === 'addMultBuff') shopAddMultBuff += buff.value;
+    if (buff.type === 'placeholder') shopChipsBuff += 25;
+    if (buff.type === 'superSub') shopXMultBuff *= buff.value;
+    if (buff.type === 'formMult') shopXMultBuff *= (1 + buff.value);
   }
 
   // Carryover from double_pivot
   const carryover = state._carryoverChips || 0;
 
   // Combo chain effects
-  const phaseMult = getPhaseMult(phaseId, state.pickedPhases || []);
-  const chainBonusChips = getPhaseChainBonusChips(phaseId, state.pickedPhases || []);
+  const phaseMult = getPhaseMult(phaseId, state.pickedPhases || [], state.phaseIdx || 0);
+  const chainBonusChips = getPhaseChainBonusChips(phaseId, state.pickedPhases || [], state.phaseIdx || 0);
 
   // Tactical opponent multiplier
   const tacMult = getOpponentTacticalMultiplier(phaseId, field, state);
@@ -510,7 +517,7 @@ export function calculatePhaseScore(field, phaseId, state) {
   // finalScore = (playerChips + synergyChips + chainBonus + shopChips + carryover)
   //              × (addMult + shopAddMultBuff) × xMult × momentum × phaseMult × tacMult
   const totalChips = playerChips + synergyChips + chainBonusChips + shopChipsBuff + carryover;
-  const score = Math.round(totalChips * (addMult + shopAddMultBuff) * xMult * momentum * phaseMult * tacMult);
+  const score = Math.round(totalChips * (addMult + shopAddMultBuff) * xMult * shopXMultBuff * momentum * phaseMult * tacMult);
 
   return {
     score: Math.max(0, score),
@@ -520,6 +527,7 @@ export function calculatePhaseScore(field, phaseId, state) {
     carryoverNextPhase: carryoverChips,
     phaseMult,
     chainBonusChips,
+    shopXMultBuff,
     momentum,
     tacMult,
   };
@@ -562,6 +570,7 @@ export function estimatePhaseChips(field, phaseId, state) {
 
   for (const buff of (state.shopBuffs || [])) {
     if (buff.type === 'chipsBuff') chips += buff.value;
+    if (buff.type === 'placeholder') chips += 25;
   }
 
   chips += state._carryoverChips || 0;
@@ -581,13 +590,23 @@ export function getOpponentScore(state, roundScore) {
   return Math.round(target * (0.65 + state.matchIdx * 0.05 + rand));
 }
 
+export function resolveCurrentPhase(state) {
+  const phaseId = (state.pickedPhases || [])[state.phaseIdx || 0];
+  if (!phaseId) return { state, result: null, done: true };
+
+  const scored = calculatePhaseScore(state.field, phaseId, state);
+  const result = { ...scored, phaseId, phaseIndex: state.phaseIdx || 0, field: state.field };
+  const nextState = finishPhase(result, state);
+  const done = nextState.phaseIdx >= (state.pickedPhases || []).length;
+  return { state: nextState, result, done };
+}
+
 export function finishPhase(phaseResult, state) {
   let newState = {
     ...state,
     roundScore: (state.roundScore || 0) + phaseResult.score,
     phaseResults: [...(state.phaseResults || []), phaseResult],
     phaseIdx: (state.phaseIdx || 0) + 1,
-    pickedPhases: [...(state.pickedPhases || []), phaseResult.phaseId].filter(Boolean),
     _carryoverChips: phaseResult.carryoverNextPhase || 0,
   };
 
@@ -659,10 +678,9 @@ export function resetRound(state) {
     phaseResults: [],
     phaseIdx: 0,
     pickedPhases: [],
-    dealtPhases: dealPhases(),
+    dealtPhases: [],
     momentum: 1.0,
     _carryoverChips: 0,
-    field: [],
     roundIdx: (state.roundIdx || 0) + 1,
   };
 }
@@ -692,7 +710,7 @@ export function buyShopItem(itemId, state) {
     newState.shopBuffs = [...(newState.shopBuffs || []), { type: eff.type, value: eff.value, itemId }];
   }
 
-  return { state: newState, success: true, message: `Bought ${item.name}.` };
+  return { state: { ...newState, purchasedItems: [...(newState.purchasedItems || []), itemId] }, success: true, message: `Bought ${item.name}.` };
 }
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────

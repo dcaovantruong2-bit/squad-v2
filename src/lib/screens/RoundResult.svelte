@@ -1,0 +1,26 @@
+<script>
+  import { game, currentMatch, continueAfterRound } from '../store.js';
+  $: outcome = $game.lastRoundOutcome || { won:false, score:0 };
+  $: target = $currentMatch?.targets[$game.roundIdx] || 0;
+  $: wins = ($game.roundResults || []).filter(r=>r.won).length;
+  $: losses = ($game.roundResults || []).length - wins;
+  $: decided = wins >= 2 || losses >= 2 || ($game.roundResults || []).length >= 3;
+</script>
+
+<div class="round-shell" class:won={outcome.won}>
+  <header><span>{$currentMatch?.tier}</span><strong>ROUND {($game.roundResults || []).length} — {outcome.won?'WON':'LOST'}</strong><span>BEST OF THREE</span></header>
+  <main>
+    <div class="result-mark"><span>{outcome.won?'✓':'×'}</span><small>{outcome.won?'TARGET BEATEN':'TARGET MISSED'}</small><h1>{outcome.score.toLocaleString()}</h1><b>OF {target.toLocaleString()} REQUIRED</b></div>
+    <section class="score-sheet">
+      <span class="kicker">MATCH CARD</span><h2>{$currentMatch?.opponent}</h2>
+      <div class="rounds">{#each [0,1,2] as i}{@const r=$game.roundResults?.[i]}<div class:win={r?.won} class:loss={r&&!r.won}><span>ROUND {i+1}</span><strong>{r?r.score.toLocaleString():'—'}</strong><small>{r?(r.won?'W':'L'):'TO PLAY'}</small></div>{/each}</div>
+      <div class="series"><div><small>ROUNDS WON</small><strong>{wins}</strong></div><i>—</i><div><small>ROUNDS LOST</small><strong>{losses}</strong></div></div>
+      <p>{decided ? (wins>=2?'The tie is yours. The dressing room celebrates.':'The tie is over. Your campaign ends here.') : 'Reset. Recover. One more round can change the tie.'}</p>
+    </section>
+  </main>
+  <footer><div><small>{decided?'MATCH DECIDED':'NEXT ROUND'}</small><strong>{decided?(wins>=2?'VICTORY':'ELIMINATED'):`ROUND ${$game.roundIdx+2}`}</strong></div><p>{decided?'The final whistle confirms the result.':'Pick a fresh three-phase plan.'}</p><button on:click={continueAfterRound}>{decided?(wins>=2?'LEAVE THE GROUND':'FACE THE PRESS'):'TEAM TALK'} <b>→</b></button></footer>
+</div>
+
+<style>
+  :global(body){overflow:hidden}.round-shell{--accent:#b64d44;min-height:100vh;height:100vh;padding-bottom:80px;color:#eee6d6;background:radial-gradient(circle at 50% 20%,rgba(128,47,45,.2),transparent 40%),linear-gradient(#151d18,#080d0a)}.round-shell.won{--accent:#57936a;background:radial-gradient(circle at 50% 20%,rgba(76,132,89,.25),transparent 40%),linear-gradient(#142019,#080d0a)}header{height:82px;display:flex;justify-content:space-between;align-items:center;padding:0 36px;background:#080e0a;border-bottom:1px solid #354139;font-family:var(--font-display);font-size:.29rem;color:#758279}header strong{font-size:.6rem;color:#eee6d6}main{height:calc(100vh - 162px);width:min(1040px,calc(100% - 40px));margin:auto;display:grid;grid-template-columns:370px 1fr;gap:35px;align-items:center}.result-mark{text-align:center}.result-mark>span{width:86px;height:86px;margin:auto;display:grid;place-items:center;border:3px solid var(--accent);border-radius:50%;font:3rem Georgia;color:var(--accent)}.result-mark small{display:block;font-family:var(--font-display);font-size:.34rem;color:#89958d;margin-top:22px}.result-mark h1{font-family:Georgia,serif;font-style:italic;font-size:5rem;line-height:1}.result-mark b{font-family:var(--font-display);font-size:.31rem;color:#8e9a92}.score-sheet{color:#292b27;background:#d7d0bd;border-top:6px solid var(--accent);box-shadow:10px 12px 0 rgba(0,0,0,.22);padding:25px}.kicker{font-family:var(--font-display);font-size:.28rem;color:#81413b}.score-sheet h2{font-family:var(--font-display);font-size:.55rem;margin:9px 0 20px;padding-bottom:12px;border-bottom:2px solid #373a33}.rounds{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.rounds div{padding:12px 8px;text-align:center;background:rgba(255,255,255,.22);border-bottom:4px solid #96988e}.rounds div.win{border-color:#4f8c61}.rounds div.loss{border-color:#b24e47}.rounds span,.rounds small{display:block;font-family:var(--font-display);font-size:.24rem;color:#73766d}.rounds strong{display:block;font-family:Georgia,serif;font-style:italic;font-size:1.35rem;margin:6px}.series{display:flex;justify-content:center;align-items:center;gap:24px;margin:28px 0;text-align:center}.series small{display:block;font-family:var(--font-display);font-size:.25rem;color:#73766d}.series strong{font-family:Georgia,serif;font-style:italic;font-size:2.3rem}.series i{font-size:1.4rem}.score-sheet p{text-align:center;color:#676a62;font-style:italic}footer{position:fixed;left:0;right:0;bottom:0;height:80px;display:grid;grid-template-columns:270px 1fr 280px;align-items:center;background:#080e0a;border-top:1px solid #354139}footer>div{height:100%;display:flex;flex-direction:column;justify-content:center;padding-left:30px;border-right:1px solid #29342d}footer small{font-family:var(--font-display);font-size:.25rem;color:#6f7d74}footer strong{font-family:var(--font-display);font-size:.42rem;margin-top:6px}footer p{text-align:center;color:#7d8981;font-style:italic}footer button{height:100%;border-radius:0;clip-path:polygon(12% 0,100% 0,100% 100%,0 100%);background:var(--accent);color:#f0e6d4;font-size:.44rem}@media(max-width:750px){main{height:auto;display:flex;flex-direction:column;padding:40px 0}.round-shell{height:auto;min-height:100vh}footer{grid-template-columns:1fr 200px}footer p{display:none}}
+</style>

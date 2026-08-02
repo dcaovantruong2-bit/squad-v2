@@ -1,5 +1,9 @@
 import { writable, derived } from 'svelte/store';
-import { createGameState, autoFillSquad, autoRecommendFormation, calculateChips, getPositionPenalty, dealPhases } from './engine/engine.js';
+import {
+  createGameState, autoFillSquad, autoRecommendFormation, calculateChips,
+  getPositionPenalty, dealPhases, resolveCurrentPhase, finishRound,
+  finishMatch, resetRound, buyShopItem,
+} from './engine/engine.js';
 import { PLAYERS, FORMATIONS, CAMPAIGN_MATCHES, POSITION_ADJACENCY } from './engine/data.js';
 // ─── Current screen ───────────────────────────────────────────────────────────
 export const screen = writable('title');
@@ -248,11 +252,15 @@ export function setFormation(formationId) {
 
 // Enter the phases screen: deal this round's phases (5, pick 3).
 export function startPhaseSelection() {
-  game.update(g => ({
-    ...g,
-    dealtPhases: dealPhases(),
-    pickedPhases: [],
-  }));
+  game.update(g => {
+    const scout = (g.shopBuffs || []).some(b => b.type === 'scout');
+    return {
+      ...g,
+      dealtPhases: dealPhases(scout ? 8 : 5),
+      pickedPhases: [],
+      shopBuffs: (g.shopBuffs || []).filter(b => b.type !== 'scout'),
+    };
+  });
   screen.set('phases');
 }
 
@@ -278,5 +286,76 @@ export function unpickPhase(slotIndex) {
 }
 
 export function confirmPhases() {
+  game.update(g => ({ ...g, phaseIdx: 0, phaseResults: [], roundScore: 0 }));
   screen.set('match');
+}
+
+export function playCurrentPhase() {
+  let done = false;
+  game.update(g => {
+    const resolved = resolveCurrentPhase(g);
+    done = resolved.done;
+    return {
+      ...resolved.state,
+      lastPhaseResult: resolved.result,
+    };
+  });
+  screen.set('phase-result');
+  return done;
+}
+
+export function continueAfterPhase() {
+  let done = false;
+  game.update(g => {
+    done = (g.phaseIdx || 0) >= (g.pickedPhases || []).length;
+    return g;
+  });
+  if (done) {
+    settleRound();
+    screen.set('round-result');
+  } else {
+    screen.set('match');
+  }
+}
+
+export function settleRound() {
+  let outcome = null;
+  game.update(g => {
+    outcome = finishRound(g);
+    return { ...outcome.state, lastRoundOutcome: { won: outcome.roundWon, score: outcome.roundScore } };
+  });
+  return outcome;
+}
+
+export function continueAfterRound() {
+  let nextScreen = 'phases';
+  game.update(g => {
+    const results = g.roundResults || [];
+    const wins = results.filter(r => r.won).length;
+    const losses = results.length - wins;
+    const matchDecided = wins >= 2 || losses >= 2 || results.length >= 3;
+    if (matchDecided) {
+      const outcome = finishMatch(g);
+      if (!outcome.matchWon) nextScreen = 'campaign-lost';
+      else if (outcome.outcome === 'campaign-won') nextScreen = 'campaign-complete';
+      else nextScreen = 'shop';
+      return { ...outcome.state, morale: Math.min(20, (outcome.state.morale || 0) + 3), lastMatchOutcome: { won: outcome.matchWon, roundsWon: wins } };
+    }
+    return resetRound(g);
+  });
+  if (nextScreen === 'phases') startPhaseSelection();
+  else screen.set(nextScreen);
+}
+
+export function purchaseItem(itemId) {
+  let response;
+  game.update(g => {
+    response = buyShopItem(itemId, g);
+    return { ...response.state, shopMessage: response.message };
+  });
+  return response;
+}
+
+export function continueFromShop() {
+  startPhaseSelection();
 }
