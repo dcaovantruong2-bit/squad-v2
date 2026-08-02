@@ -170,8 +170,8 @@
 
               {#if slotIdx < 2}
                 {@const info = arrowInfos[slotIdx]}
-                <div class="link-zone" class:active={info}>
-                  <span class="link-arrow">›››</span>
+                <div class="link-zone" class:active={info} style={info ? `--link-color:${info.color}` : ''}>
+                  <span class="link-arrow">›</span>
                   {#if info}
                     <div class="link-callout" style={`--link-color:${info.color}`}>
                       <strong>{info.label}</strong><small>{info.desc}</small>
@@ -356,7 +356,8 @@
   .remove-phase { font-family:var(--font-display); font-size:.28rem; color:#bd7461; margin-top:4px; opacity:0; transition:opacity .2s; }
   .chosen-phase:hover .remove-phase { opacity:1; }
   .link-zone { position:absolute; z-index:3; left:calc(100% - 20px); width:calc(100% - 112px); display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,.38); pointer-events:none; }
-  .link-arrow { letter-spacing:.24em; font-size:1.1rem; text-shadow:0 2px 5px rgba(0,0,0,.55); }
+  .link-zone::before { content:''; position:absolute; left:16px; right:16px; top:50%; height:2px; background:var(--link-color, rgba(255,255,255,.22)); transform:translateY(-50%); }
+  .link-arrow { position:relative; font-family:Georgia,serif; font-size:1.5rem; line-height:1; font-weight:bold; color:var(--link-color, rgba(255,255,255,.38)); text-shadow:0 2px 5px rgba(0,0,0,.55); animation:arrow-pulse 1.4s ease-in-out infinite; }
   .link-awaiting { position:absolute; top:22px; font-family:var(--font-display); font-size:.27rem; letter-spacing:.12em; }
   .link-callout { position:absolute; bottom:22px; padding:6px 7px; width:88px; text-align:center; background:#142017; border-bottom:3px solid var(--link-color); box-shadow:0 5px 10px rgba(0,0,0,.25); animation:callout-in .24s ease-out; }
   .link-callout strong { display:block; font-family:var(--font-display); font-size:.45rem; color:var(--link-color); }
@@ -397,6 +398,7 @@
   .footer-message { padding:0 24px; text-align:center; color:#829087; font-style:italic; font-size:1rem; }
   .kickoff-button { height:100%; border-radius:0; display:flex; align-items:center; justify-content:center; gap:18px; background:var(--orange); color:#161916; clip-path:polygon(12% 0,100% 0,100% 100%,0 100%); transition:filter .2s; }
   .kickoff-button:not(:disabled):hover { filter:brightness(1.1); }
+  .kickoff-button:not(:disabled) { animation:kick-glow 1.8s ease-in-out infinite; }
   .kickoff-button:disabled { background:#27312a; color:#69756d; cursor:not-allowed; }
   .button-label { font-family:var(--font-display); font-size:.68rem; }
   .button-ball { width:31px; height:31px; display:grid; place-items:center; color:#181b18; border:2px solid currentColor; border-radius:50%; font-size:.4rem; }
@@ -404,6 +406,8 @@
   @keyframes deal-in { from { opacity:0; transform:translateY(18px) rotate(1deg); } to { opacity:1; transform:none; } }
   @keyframes callout-in { from { opacity:0; transform:scale(.8); } to { opacity:1; transform:scale(1); } }
   @keyframes pulse { 50% { opacity:.35; } }
+  @keyframes arrow-pulse { 50% { opacity:.55; } }
+  @keyframes kick-glow { 50% { filter:brightness(1.22); box-shadow:0 0 24px rgba(237,124,62,.35); } }
 
   @media (max-width: 1120px) {
     .match-layout { grid-template-columns:1fr; }
@@ -429,7 +433,7 @@
     .link-zone { top:calc(100% - 15px); left:50%; width:80px; transform:translateX(-50%) rotate(90deg); }.link-callout { display:none; }
     .dugout-heading { align-items:flex-start; }.instruction { max-width:140px; text-align:right; line-height:1.5; }
     .phase-hand { display:flex; overflow-x:auto; padding:0 4px 18px; scroll-snap-type:x mandatory; }.play-card { min-width:205px; scroll-snap-align:start; }
-    .match-footer { height:112px; grid-template-columns:1fr 180px; }.footer-detail { padding-left:16px; }.footer-message { display:none; }.kickoff-button { grid-column:2; grid-row:1; }
+    .match-footer { height:112px; grid-template-columns:1fr 1fr 180px; }.footer-detail { padding-left:16px; grid-column:1; }.footer-message { display:none; }.kickoff-button { grid-column:3; grid-row:1; }
   }
 
   @media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation-duration:.01ms !important; transition-duration:.01ms !important; } }

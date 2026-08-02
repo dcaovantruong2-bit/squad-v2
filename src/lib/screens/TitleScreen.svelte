@@ -171,6 +171,8 @@
     font-size: 0.5rem;
     color: var(--muted);
     letter-spacing: 0.15em;
+    line-height: 1.9;
+    padding-top: 4px;
     margin-bottom: 10px;
   }
   .matches { display: flex; flex-direction: column; gap: 6px; }

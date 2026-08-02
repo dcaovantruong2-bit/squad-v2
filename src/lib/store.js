@@ -5,6 +5,7 @@ import {
   finishMatch, resetRound, buyShopItem,
 } from './engine/engine.js';
 import { PLAYERS, FORMATIONS, CAMPAIGN_MATCHES, POSITION_ADJACENCY } from './engine/data.js';
+import { sfx } from './sfx.js';
 // ─── Current screen ───────────────────────────────────────────────────────────
 export const screen = writable('title');
 // screens: 'title' | 'squad' | 'phases' | 'match' | 'phase-result'
@@ -43,10 +44,12 @@ export function slotEligibility(player, slotPos) {
 
 // ─── Actions ─────────────────────────────────────────────────────────────────
 export function navigate(to) {
+  sfx.click();
   screen.set(to);
 }
 
 export function startNewGame() {
+  sfx.click();
   const g = createGameState();
   g.formation = '4-4-2';
   g.slotAssignments = {}; // { slotIndex: playerId }
@@ -55,6 +58,7 @@ export function startNewGame() {
 }
 
 export function quickStart() {
+  sfx.click();
   game.update(g => {
     const ids = autoFillSquad('4-4-2');
     const rec = autoRecommendFormation(ids);
@@ -268,6 +272,7 @@ export function startPhaseSelection() {
 // empty slot — pick order matters because combo chains fire between
 // consecutive picks.
 export function pickPhase(phaseId) {
+  sfx.pick();
   game.update(g => {
     if ((g.pickedPhases || []).length >= 3) return g;
     if (g.pickedPhases.includes(phaseId)) return g;
@@ -277,6 +282,7 @@ export function pickPhase(phaseId) {
 
 // Remove a phase from the sequence at a given slot (tap the filled slot).
 export function unpickPhase(slotIndex) {
+  sfx.unpick();
   game.update(g => {
     const picked = [...(g.pickedPhases || [])];
     if (slotIndex < 0 || slotIndex >= picked.length) return g;
@@ -286,12 +292,14 @@ export function unpickPhase(slotIndex) {
 }
 
 export function confirmPhases() {
+  sfx.kickoff();
   game.update(g => ({ ...g, phaseIdx: 0, phaseResults: [], roundScore: 0 }));
   screen.set('match');
 }
 
 export function playCurrentPhase() {
   let done = false;
+  sfx.phase();
   game.update(g => {
     const resolved = resolveCurrentPhase(g);
     done = resolved.done;
@@ -324,6 +332,7 @@ export function settleRound() {
     outcome = finishRound(g);
     return { ...outcome.state, lastRoundOutcome: { won: outcome.roundWon, score: outcome.roundScore } };
   });
+  if (outcome?.roundWon) sfx.win(); else sfx.lose();
   return outcome;
 }
 
@@ -336,9 +345,9 @@ export function continueAfterRound() {
     const matchDecided = wins >= 2 || losses >= 2 || results.length >= 3;
     if (matchDecided) {
       const outcome = finishMatch(g);
-      if (!outcome.matchWon) nextScreen = 'campaign-lost';
-      else if (outcome.outcome === 'campaign-won') nextScreen = 'campaign-complete';
-      else nextScreen = 'shop';
+      if (!outcome.matchWon) { nextScreen = 'campaign-lost'; sfx.defeat(); }
+      else if (outcome.outcome === 'campaign-won') { nextScreen = 'campaign-complete'; sfx.victory(); }
+      else { nextScreen = 'shop'; sfx.win(); }
       return { ...outcome.state, morale: Math.min(20, (outcome.state.morale || 0) + 3), lastMatchOutcome: { won: outcome.matchWon, roundsWon: wins } };
     }
     return resetRound(g);
@@ -349,6 +358,7 @@ export function continueAfterRound() {
 
 export function purchaseItem(itemId) {
   let response;
+  sfx.buy();
   game.update(g => {
     response = buyShopItem(itemId, g);
     return { ...response.state, shopMessage: response.message };
@@ -357,5 +367,13 @@ export function purchaseItem(itemId) {
 }
 
 export function continueFromShop() {
+  sfx.kickoff();
   startPhaseSelection();
+}
+
+// ─── Dev/test hook ────────────────────────────────────────────────────────────
+// Exposes the live store instances for Playwright/e2e (dev server only).
+// Lets tests drive screens directly instead of clicking through 5 matches.
+if (import.meta.env && import.meta.env.DEV) {
+  window.__squad = { game, screen, continueAfterRound, startPhaseSelection };
 }
