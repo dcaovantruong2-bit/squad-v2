@@ -251,13 +251,13 @@ export const OPPONENT_TACTICS = {
 
 export const SHOP_ITEMS = {
   "energy_drink":     { name:"Energy Drink",             cost:2, effect:{type:"fullReset",       value:1},    desc:"Restore one players fatigue to 100%" },
-  "tactical_upgrade": { name:"Tactical Upgrade",         cost:3, effect:{type:"placeholder",    value:1},    desc:"+1 to a chosen stat on one player" },
+  "tactical_upgrade": { name:"Tactical Upgrade",         cost:3, effect:{type:"coachingBuff",    value:25},   desc:"Next round: coaching detail adds +25 base chips" },
   "set_piece_drill":  { name:"Set Piece Drill",          cost:4, effect:{type:"chipsBuff",       value:40},   desc:"Next round: all phases get +40 chips" },
   "super_sub":        { name:"Super Sub",                cost:2, effect:{type:"superSub",        value:1.3},  desc:"Next round: fresh player gets x1.3" },
   "tactical_shift":   { name:"Tactical Shift",           cost:5, effect:{type:"addMultBuff",    value:5},    desc:"Next round: +5 add_mult on all phases" },
   "formation_tweak":  { name:"Formation Tweak",          cost:3, effect:{type:"formMult",        value:0.05}, desc:"+0.05 formation mult for next match" },
   "momentum_injector":{ name:"Momentum Injector",        cost:4, effect:{type:"momentumBoost",  value:1.5},  desc:"Next phase starts at x1.5 momentum" },
   "scout_report":     { name:"Scout Report",             cost:2, effect:{type:"scout",           value:1},    desc:"See all 8 phases this round" },
-  "double_session":   { name:"Double Training Session",  cost:4, effect:{type:"fatiguePenalty",  value:0.8},  desc:"This round fatigue penalty x0.8 instead of x0.7" },
+  "double_session":   { name:"Double Training Session",  cost:4, effect:{type:"fatiguePenalty",  value:1},    desc:"Next round: squad plays on fresh legs — no energy loss" },
   "morale_boost":     { name:"Morale Boost",             cost:1, effect:{type:"morale",          value:5},    desc:"+5 morale" },
 };

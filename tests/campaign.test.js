@@ -56,6 +56,51 @@ test('first phase has no chain penalty and later phases use their actual predece
   assert.equal(second.result.phaseMult, 0.9);
 });
 
+test('only players contributing to a phase spend energy', () => {
+  const state = playableState();
+  const resolved = resolveCurrentPhase(state);
+  const participating = new Set(resolved.result.breakdown.map(row => row.player.id));
+
+  for (const entry of state.field) {
+    const energy = resolved.state.energy[entry.player.id]?.current;
+    if (participating.has(entry.player.id)) assert.equal(energy, 2);
+    else assert.equal(energy, undefined);
+  }
+});
+
+test('round-scoped buffs expire after the round while match buffs survive', () => {
+  const state = {
+    ...playableState(),
+    roundScore: 2500,
+    shopBuffs: [
+      { type: 'chipsBuff', value: 40, itemId: 'set_piece_drill' },
+      { type: 'formMult', value: 0.05, itemId: 'formation_tweak' },
+    ],
+  };
+  const outcome = finishRound(state);
+  assert.deepEqual(outcome.state.shopBuffs, [
+    { type: 'formMult', value: 0.05, itemId: 'formation_tweak' },
+  ]);
+});
+
+test('match-scoped buffs expire when the match finishes', () => {
+  const state = {
+    ...playableState(),
+    roundResults: [{ won:true }, { won:true }],
+    shopBuffs: [{ type: 'formMult', value: 0.05, itemId: 'formation_tweak' }],
+  };
+  assert.deepEqual(finishMatch(state).state.shopBuffs, []);
+});
+
+test('fatigue shield prevents energy drain for its next round', () => {
+  const state = {
+    ...playableState(),
+    shopBuffs: [{ type: 'fatigueShield', value: 1, itemId: 'double_session' }],
+  };
+  const resolved = resolveCurrentPhase(state);
+  assert.deepEqual(resolved.state.energy, {});
+});
+
 test('resetRound preserves the selected field and advances the round', () => {
   const state = playableState();
   const next = resetRound({ ...state, roundIdx: 0, roundScore: 1234 });

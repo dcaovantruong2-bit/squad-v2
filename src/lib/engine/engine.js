@@ -495,7 +495,7 @@ export function calculatePhaseScore(field, phaseId, state) {
   for (const buff of (state.shopBuffs || [])) {
     if (buff.type === 'chipsBuff') shopChipsBuff += buff.value;
     if (buff.type === 'addMultBuff') shopAddMultBuff += buff.value;
-    if (buff.type === 'placeholder') shopChipsBuff += 25;
+    if (buff.type === 'coachingBuff') shopChipsBuff += buff.value;
     if (buff.type === 'superSub') shopXMultBuff *= buff.value;
     if (buff.type === 'formMult') shopXMultBuff *= (1 + buff.value);
   }
@@ -570,7 +570,7 @@ export function estimatePhaseChips(field, phaseId, state) {
 
   for (const buff of (state.shopBuffs || [])) {
     if (buff.type === 'chipsBuff') chips += buff.value;
-    if (buff.type === 'placeholder') chips += 25;
+    if (buff.type === 'coachingBuff') chips += buff.value;
   }
 
   chips += state._carryoverChips || 0;
@@ -595,7 +595,12 @@ export function resolveCurrentPhase(state) {
   if (!phaseId) return { state, result: null, done: true };
 
   const scored = calculatePhaseScore(state.field, phaseId, state);
-  const result = { ...scored, phaseId, phaseIndex: state.phaseIdx || 0, field: state.field };
+  const result = {
+    ...scored,
+    phaseId,
+    phaseIndex: state.phaseIdx || 0,
+    field: scored.breakdown.map(row => ({ player: row.player, position: row.position })),
+  };
   const nextState = finishPhase(result, state);
   const done = nextState.phaseIdx >= (state.pickedPhases || []).length;
   return { state: nextState, result, done };
@@ -617,9 +622,13 @@ export function finishPhase(phaseResult, state) {
     newState.momentum = Math.min(1.3, (state.momentum || 1.0) + 0.1);
   }
 
-  // Drain energy for all players in field
-  for (const entry of (phaseResult.field || [])) {
-    newState = usePlayerEnergy(entry.player.id, newState);
+  // Drain energy only for players who contributed to this phase.
+  // Double Training Session shields the next round from fatigue entirely.
+  const fatigueShield = (state.shopBuffs || []).some(buff => buff.type === 'fatigueShield');
+  if (!fatigueShield) {
+    for (const entry of (phaseResult.field || [])) {
+      newState = usePlayerEnergy(entry.player.id, newState);
+    }
   }
 
   return newState;
@@ -639,6 +648,7 @@ export function finishRound(state) {
     phaseIdx: 0,
     pickedPhases: [],
     dealtPhases: [],
+    shopBuffs: (state.shopBuffs || []).filter(buff => buff.type === 'formMult'),
     momentum: 1.0,
     _carryoverChips: 0,
   };
@@ -655,6 +665,7 @@ export function finishMatch(state) {
     matchResults: [...(state.matchResults || []), { matchIdx: state.matchIdx, won: matchWon, roundsWon }],
     roundResults: [],
     roundIdx: 0,
+    shopBuffs: [],
   };
 
   if (!matchWon) {
@@ -705,8 +716,9 @@ export function buyShopItem(itemId, state) {
     const lowestId = Object.entries(newState.energy || {})
       .sort((a, b) => a[1].current - b[1].current)[0]?.[0];
     if (lowestId) newState = recoverEnergy(lowestId, newState);
+  } else if (eff.type === 'fatiguePenalty') {
+    newState.shopBuffs = [...(newState.shopBuffs || []), { type: 'fatigueShield', value: eff.value, itemId }];
   } else {
-    // Buffer the effect for next round/phase
     newState.shopBuffs = [...(newState.shopBuffs || []), { type: eff.type, value: eff.value, itemId }];
   }
 
