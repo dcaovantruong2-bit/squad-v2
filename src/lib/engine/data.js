@@ -175,6 +175,55 @@ export const ALL_PHASES = [
   { id:"set_piece",       name:"Set Piece",     tag:"Specialist",  weight:"SPC", slots:["CAM","CB","ST"], desc:"Dead ball specialist - aerial threat" },
 ];
 
+// Human-readable requirement + reward, GENERATED from the trigger and effect
+// objects rather than hand-written. Every hand-written `description` in this
+// file disagreed with its own numbers (30 mismatches: "+15 mult each" on an
+// addMult of 10, ">= 18" on a threshold of 20, "x1.5" on an xMult of 1.25).
+// Deriving them makes that class of bug impossible: change a value, the text
+// follows. Call describeSynergy(syn) instead of reading syn.description.
+const STAT_LABEL = { atk:'ATK', pac:'PAC', pas:'PAS', def_:'DEF', spc:'SPC' };
+const S = k => STAT_LABEL[k] || String(k || '').toUpperCase();
+
+export function describeTrigger(syn) {
+  const t = syn.trigger || {};
+  if (t.minDuplicates)  return `${t.minDuplicates}+ players in the same position`;
+  if (t.trait)          return `${t.minCount}+ ${t.trait} players in the squad`;
+  if (t.traits)         return `${t.minCount}+ players who are ${t.traits.join(' or ')}`;
+  if (t.position && t.thresholdA != null)
+    return `a ${t.position} with ${S(t.statA)} >= ${t.thresholdA} and ${S(t.statB)} >= ${t.thresholdB}`;
+  if (t.thresholdA != null && t.thresholdB != null)
+    return `any player ${S(t.statA)} >= ${t.thresholdA} + any player ${S(t.statB)} >= ${t.thresholdB}`;
+  if (t.posA && t.wingerPos)
+    return `${t.posA} ${S(t.statA)} + winger ${S(t.statB)} >= ${t.threshold}`;
+  if (t.posA && t.posB)
+    return `${t.posA} ${S(t.statA || t.stat)} + ${t.posB} ${S(t.statB || t.stat)} >= ${t.threshold}`;
+  if (t.positions && t.count)
+    return `${t.positions.join(' + ')} all ${S(t.stat)} >= ${t.threshold}`;
+  if (t.positions)
+    return `${t.positions.join(' + ')} ${S(t.statA || t.stat)}${t.statB ? ` + ${S(t.statB)}` : ''} >= ${t.threshold}`;
+  if (t.count)   return `${t.count} players with ${S(t.stat)} >= ${t.threshold}`;
+  if (t.stat)    return `2 highest ${S(t.stat)} sum >= ${t.threshold}`;
+  return 'special condition';
+}
+
+export function describeEffect(syn) {
+  const e = syn.effect || {};
+  const parts = [];
+  if (e.chips)       parts.push(`+${e.chips} chips`);
+  if (e.addMult)     parts.push(`+${e.addMult} mult${syn.id === 'overload' ? ' per extra player' : ''}`);
+  if (e.xMult)       parts.push(`x${e.xMult} mult`);
+  if (e.carryover)   parts.push(`+${e.carryover} chips carried into the next phase`);
+  if (e.addChips)    parts.push(`+${e.addChips} chips${e.target === 'all' ? ' to every player' : e.targetPositions ? ` to each ${e.targetPositions.join('/')}` : ''}`);
+  if (e.playerMult)  parts.push(`x${e.playerMult} to every ${e.targetTrait} player`);
+  if (e.positionMult)parts.push(`x${e.positionMult} to each ${(e.targetPositions || []).join('/')}`);
+  if (e.special === 'fatigue_reset') parts.push('one free fatigue reset per match');
+  return parts.join(', ') || 'no effect';
+}
+
+export function describeSynergy(syn) {
+  return `${describeTrigger(syn)}: ${describeEffect(syn)}`;
+}
+
 export const SYNERGIES = [
   // === Position-pair synergies ===
   { id:"clean_sheet",         name:"Clean Sheet",       tag:"defensive",  trigger:{posA:"GK",posB:"CB",stat:"def_",threshold:20},   effect:{chips:50},   description:"GK DEF + CB DEF >= 18: +50 chips" },
@@ -227,16 +276,59 @@ export const COMBO_CHAINS = {
   "Transition_Possession":   { effect:"xMult",            value:0.85, desc:"Lost momentum! Hesitated on counter - x0.85" },
   "Attacking_Possession":    { effect:"xMult",            value:0.9,  desc:"Pulled back! Killed the attack - x0.9" },
   "Defensive_Possession":    { effect:"xMult",            value:0.9,  desc:"Too slow! Defence to possession transition - x0.9" },
+
+  // --- Specialist pairs. "Specialist_Any" is a wildcard fallback (see
+  // lookupChain), but the specific follow-ups deserve their own values: a set
+  // piece is a reset, so what you do NEXT is what matters.
+  "Specialist_Attacking":    { effect:"xMult",            value:1.4,  desc:"Second ball attacked! Set piece chaos into a shot - x1.4" },
+  "Specialist_Transition":   { effect:"xMult",            value:1.25, desc:"Cleared, and away you go - x1.25" },
+  "Specialist_Possession":   { effect:"addChips",         value:20,   desc:"Recycle the set piece, keep it - +20 chips" },
+  "Specialist_Defensive":    { effect:"xMult",            value:0.9,  desc:"Caught upfield after the corner - x0.9" },
+  "Specialist_Specialist":   { effect:"addChips",         value:40,   desc:"Corner after corner - siege football +40 chips" },
+
+  // --- Into a set piece: you win the dead ball by applying pressure.
+  "Attacking_Specialist":    { effect:"addChips",         value:35,   desc:"Pressure wins the corner - +35 chips" },
+  "Possession_Specialist":   { effect:"addChips",         value:25,   desc:"Patient play draws the foul - +25 chips" },
+  "Transition_Specialist":   { effect:"xMult",            value:1.2,  desc:"Broke fast, won the free kick in a dangerous spot - x1.2" },
+  "Defensive_Specialist":    { effect:"addChips",         value:15,   desc:"Won a corner from the clearance - +15 chips" },
+
+  // --- The two remaining attack/transition pairs.
+  "Attacking_Transition":    { effect:"xMult",            value:1.25, desc:"Turnover high up, straight back at them - x1.25" },
+  "Transition_Attacking":    { effect:"xMult",            value:1.45, desc:"Counter becomes a sustained attack - x1.45" },
 };
 
 export const COMBO_NO_MATCH_PENALTY = 0.95;
 
+// A synergy pays full price only in phases matching its tag. Off-tag it still
+// contributes chips at this rate, but no multipliers — see relevantSynergies().
+export const OFF_TAG_CHIP_RATE = 0.5;
+
+// Morale earned for winning a round (the shop currency). Nothing paid morale
+// out before, so the shop died after the starting 10 was spent.
+export const MORALE_PER_ROUND_WIN = 4;
+
+// Targets are CALIBRATED, not guessed — `node tools/calibrate.mjs` simulates
+// full campaigns at three skill levels and searches the difficulty curve for
+// targets that produce the intended win rates. Measured at the values below:
+//
+//   perfect play  100%   (best formation, best phase every round)
+//   decent play    45%   (picks from the top half)
+//   careless play   3%   (picks at random)
+//
+// Each target is a rising fraction of what a perfect round scores in that
+// match (8% → 32%), ratcheted upward within a match but NOT across matches:
+// match 3's tactics genuinely bite harder than match 4's, so forcing a globally
+// rising line would put its targets out of reach.
+//
+// The old values (2000 → 14500) sat 3.6x–10.5x below what a competent squad
+// scores, so the campaign could not be lost. Re-run the calibrator after any
+// scoring change.
 export const CAMPAIGN_MATCHES = [
-  { name:"Group Stage",      opponent:"Wolves FC",                   targets:[2000,3500,5000],   tier:"Match 1/5", intro:"Relegation battlers. Sit deep - hard to break down.", tactics:["low_block"] },
-  { name:"Round of 16",      opponent:"Inter Your-Nan",              targets:[3000,5000,7000],   tier:"Match 2/5", intro:"Mid-table side. Possession-heavy - counters are tough.", tactics:["possession_heavy"] },
-  { name:"Quarter Final",    opponent:"Borussia Monchen-flapjack",   targets:[4000,6500,9000],   tier:"Match 3/5", intro:"Heavy metal football. Press relentlessly, hit on the break.", tactics:["high_press","counter_attack"] },
-  { name:"Semi Final",       opponent:"Man City Oilers",             targets:[5000,8000,11500],  tier:"Match 4/5", intro:"Title favourites. Elite man-marking. Score early.", tactics:["man_mark","time_waste"] },
-  { name:"THE FINAL",        opponent:"Galacticos FC",               targets:[6500,10000,14500], tier:"Match 5/5", intro:"The best in the world. Everything thrown at you.", tactics:["dirty_team","man_mark","high_press"] },
+  { name:"Group Stage",      opponent:"Wolves FC",                   targets:[2000,2250,2750],   tier:"Match 1/5", intro:"Relegation battlers. Sit deep - hard to break down.", tactics:["low_block"] },
+  { name:"Round of 16",      opponent:"Inter Your-Nan",              targets:[4000,4500,5000],   tier:"Match 2/5", intro:"Mid-table side. Possession-heavy - counters are tough.", tactics:["possession_heavy"] },
+  { name:"Quarter Final",    opponent:"Borussia Monchen-flapjack",   targets:[4000,4500,4750],   tier:"Match 3/5", intro:"Heavy metal football. Press relentlessly, hit on the break.", tactics:["high_press","counter_attack"] },
+  { name:"Semi Final",       opponent:"Man City Oilers",             targets:[7250,7750,8250],   tier:"Match 4/5", intro:"Title favourites. Elite man-marking. Score early.", tactics:["man_mark","time_waste"] },
+  { name:"THE FINAL",        opponent:"Galacticos FC",               targets:[9000,9500,10000],  tier:"Match 5/5", intro:"The best in the world. Everything thrown at you.", tactics:["dirty_team","man_mark","high_press"] },
 ];
 
 export const OPPONENT_TACTICS = {

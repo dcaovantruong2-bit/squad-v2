@@ -12,7 +12,7 @@ import {
   getPositionPenalty,
   getEnergyMultiplier,
 } from '../src/lib/engine/engine.js';
-import { PLAYERS, FORMATIONS } from '../src/lib/engine/data.js';
+import { PLAYERS, FORMATIONS, CAMPAIGN_MATCHES } from '../src/lib/engine/data.js';
 
 function playableState() {
   const formation = FORMATIONS.find(f => f.id === '4-4-2');
@@ -118,13 +118,19 @@ test('round-scoped buffs expire after the round while match buffs survive', () =
   ]);
 });
 
-test('match-scoped buffs expire when the match finishes', () => {
+test('consumables expire at the final whistle, permanent upgrades do not', () => {
+  // Permanent upgrades deliberately carry across matches — that squad
+  // progression is what makes the rising difficulty curve clearable.
   const state = {
     ...playableState(),
     roundResults: [{ won:true }, { won:true }],
-    shopBuffs: [{ type: 'formMult', value: 0.05, itemId: 'formation_tweak' }],
+    shopBuffs: [
+      { type: 'formMult', value: 0.05, itemId: 'formation_tweak' },
+      { type: 'chipsBuff', value: 50, itemId: 'some_consumable' },
+    ],
   };
-  assert.deepEqual(finishMatch(state).state.shopBuffs, []);
+  const after = finishMatch(state).state.shopBuffs;
+  assert.deepEqual(after, [{ type: 'formMult', value: 0.05, itemId: 'formation_tweak' }]);
 });
 
 test('fatigue shield prevents energy drain for its next round', () => {
@@ -147,7 +153,11 @@ test('resetRound preserves the selected field and advances the round', () => {
 });
 
 test('finishRound records the result and clears only round-scoped scoring state', () => {
-  const state = { ...playableState(), roundScore: 2500 };
+  // Derive the winning score from the data instead of hardcoding one: targets
+  // are re-measured by tools/balance.mjs and a literal here goes stale silently.
+  const base = playableState();
+  const target = CAMPAIGN_MATCHES[base.matchIdx || 0].targets[base.roundIdx || 0];
+  const state = { ...base, roundScore: target + 1 };
   const outcome = finishRound(state);
 
   assert.equal(outcome.roundWon, true);

@@ -7,6 +7,7 @@ import {
   PLAYERS, CHIPS_FORMULA, POSITION_ADJACENCY, TRAIT_SLOT_FIT,
   FORMATIONS, ALL_PHASES, SYNERGIES, COMBO_CHAINS, COMBO_NO_MATCH_PENALTY,
   CAMPAIGN_MATCHES, OPPONENT_TACTICS, SHOP_ITEMS,
+  OFF_TAG_CHIP_RATE, MORALE_PER_ROUND_WIN, describeSynergy, describeEffect,
 } from './data.js';
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
@@ -31,9 +32,17 @@ export function createGameState() {
     shopBuffs: [],
     purchasedItems: [],
     momentum: 1.0,
+    // Players knocked out for the rest of the current match by dirty_team.
+    // Cleared when the next match starts.
+    injured: [],
     campaignWon: false,
     campaignLost: false,
   };
+}
+
+// An injured player contributes nothing for the rest of the match.
+export function isInjured(playerId, state) {
+  return (state.injured || []).includes(playerId);
 }
 
 export function getPlayerById(id) {
@@ -174,6 +183,7 @@ export function detectSynergies(field, formationId) {
     let addMult = 0;
     let xMult = 1.0;
     let carryover = 0;
+    let stacks = 1;   // how many times this synergy pays (see `overload`)
 
     // clean_sheet: GK DEF + CB DEF >= threshold
     if (syn.id === 'clean_sheet') {
@@ -203,11 +213,16 @@ export function detectSynergies(field, formationId) {
         if (bestFbPac + bestCmPas >= t.threshold) fired = true;
       }
     }
-    // overload: 2+ same position
+    // overload: 2+ in the same position. The description promises "each", so it
+    // stacks per extra player (3 CBs = 2 stacks), not once for the whole XI.
+    // The old code `break`-ed on the first duplicate, so a 5-3-2 with three CBs
+    // and two STs paid exactly the same as a single duplicate pair.
     else if (syn.id === 'overload') {
-      for (const [pos, players] of Object.entries(playersByPos)) {
-        if (players.length >= 2) { fired = true; break; }
+      let extra = 0;
+      for (const players of Object.values(playersByPos)) {
+        if (players.length >= 2) extra += players.length - 1;
       }
+      if (extra > 0) { fired = true; stacks = extra; }
     }
     // stretch_backline: FB PAC + LW PAC >= threshold
     else if (syn.id === 'stretch_backline') {
@@ -332,13 +347,44 @@ export function detectSynergies(field, formationId) {
     if (fired) {
       const eff = syn.effect;
       if (eff.chips) totalChips += eff.chips;
-      if (eff.addMult) addMult += eff.addMult;
-      if (eff.xMult) xMult *= eff.xMult;
+      if (eff.addMult) addMult += eff.addMult * stacks;
+      if (eff.xMult) xMult *= Math.pow(eff.xMult, stacks);
       if (eff.carryover) carryover += eff.carryover;
-      results.push({ id: syn.id, name: syn.name, chips: eff.chips || 0, addMult: eff.addMult || 0, xMult: eff.xMult || 1.0, carryover });
+      results.push({
+        id: syn.id, name: syn.name, tag: syn.tag,
+        chips: totalChips, addMult, xMult, carryover, stacks,
+      });
     }
   }
   return results;
+}
+
+// Which synergies actually pay out in a given phase.
+//
+// Every synergy carries a `tag` (defensive/possession/attacking/transition/
+// specialist) that matches the tags on ALL_PHASES. That field was never read,
+// so all 10 synergies paid full price in all 8 phases: multipliers were a flat
+// ~38x no matter what you picked, phase choice was cosmetic, and every round
+// played identically.
+//
+// Now relevance decides the payout:
+//   on-tag  — the synergy suits this phase: full chips, full multipliers
+//   off-tag — the shape exists but isn't what this phase asks of it: half
+//             chips (rounded), NO multiplier contribution
+//
+// A defensive squad scores its big numbers in defensive phases, and reaching a
+// target with an attacking phase means building for it.
+export function relevantSynergies(synergies, phaseId) {
+  const phase = ALL_PHASES.find(p => p.id === phaseId);
+  const phaseTag = phase ? String(phase.tag).toLowerCase() : '';
+  return synergies.map(s => {
+    const onTag = String(s.tag || '').toLowerCase() === phaseTag;
+    return onTag
+      ? { ...s, onTag: true }
+      : { ...s, onTag: false,
+          chips: Math.round((s.chips || 0) * OFF_TAG_CHIP_RATE),
+          addMult: 0, xMult: 1.0 };
+  });
 }
 
 export function detectSquadSynergies(squad) {
@@ -354,7 +400,7 @@ export function detectSquadSynergies(squad) {
       const count = squad.filter(p => t.traits.some(tr => p.traits.includes(tr))).length;
       if (count >= t.minCount) fired = true;
     }
-    if (fired) results.push({ id: syn.id, name: syn.name, effect: syn.effect, description: syn.description });
+    if (fired) results.push({ id: syn.id, name: syn.name, effect: syn.effect, description: describeSynergy(syn) });
   }
   return results;
 }
@@ -389,6 +435,47 @@ function getOpponentTacticalMultiplier(phaseId, field, state) {
     if (tac.target === 'phaseTag' && tac.tags.includes(phaseTag)) {
       if (tac.effect === 'multiply') mult *= tac.value;
     }
+    // time_waste: they run the clock down, so the LAST phase of the round is
+    // devalued. Was declared in data.js with indices:[2] and never handled, so
+    // "Score early!" was an empty threat.
+    if (tac.target === 'phaseIndex' && tac.effect === 'multiply') {
+      const idx = state.phaseIdx ?? (state.pickedPhases || []).indexOf(phaseId);
+      if ((tac.indices || []).includes(idx)) mult *= tac.value;
+    }
+  }
+  return mult;
+}
+
+// man_mark: the opponent assigns a marker to your biggest threat — the single
+// highest-contributing player in the current XI (by raw chips in slot, so it's
+// deterministic and independent of the phase being scored). Declared in
+// data.js as target:'bestPlayer' and never implemented.
+export function getManMarkedPlayerId(field, state) {
+  if (!field || !field.length) return null;
+  const hasManMark = getOpponentTactics(state).some(t => t.target === 'bestPlayer');
+  if (!hasManMark) return null;
+  let best = null, bestChips = -1;
+  for (const { player, position } of field) {
+    const c = calculateChips(player, position) * getPositionPenalty(player, position);
+    if (c > bestChips) { bestChips = c; best = player.id; }
+  }
+  return best;
+}
+
+// Per-player multiplier from persistent squad synergies: playerMult applies by
+// trait, positionMult by slot. Both fields existed in data.js from the start
+// and were never read by the scorer, so 11 of the 12 persistent synergies were
+// inert — the squad-building layer of the game did nothing.
+export function getPersistentPlayerMult(player, position, squadSynergies) {
+  let mult = 1.0;
+  for (const { effect: eff } of squadSynergies) {
+    if (!eff) continue;
+    if (eff.playerMult && eff.targetTrait && player.traits.includes(eff.targetTrait)) {
+      mult *= eff.playerMult;
+    }
+    if (eff.positionMult && (eff.targetPositions || []).includes(position)) {
+      mult *= eff.positionMult;
+    }
   }
   return mult;
 }
@@ -402,11 +489,35 @@ function getPhaseMult(phaseId, pickedPhases, phaseIndex = null) {
   const prevPhase = ALL_PHASES.find(p => p.id === prevPhaseId);
   const currPhase = ALL_PHASES.find(p => p.id === phaseId);
   if (!prevPhase || !currPhase) return COMBO_NO_MATCH_PENALTY;
-  const key = `${prevPhase.tag}_${currPhase.tag}`;
-  const chain = COMBO_CHAINS[key];
+  const chain = lookupChain(prevPhase.tag, currPhase.tag);
   if (!chain) return COMBO_NO_MATCH_PENALTY;
   if (chain.effect === 'xMult') return chain.value;
   return 1.0;
+}
+
+// COMBO_CHAINS lookup. "Specialist_Any" is a WILDCARD, not a literal tag pair:
+// the old code built the key as `${prev}_${curr}` and looked it up directly, so
+// "Specialist_Any" could never match (no phase has the tag "Any") and every
+// set-piece follow-up silently fell through to the no-match penalty instead of
+// paying its +30 chips. Exact pairs win; the wildcard is the fallback.
+export function lookupChain(prevTag, currTag) {
+  return COMBO_CHAINS[`${prevTag}_${currTag}`]
+      || COMBO_CHAINS[`${prevTag}_Any`]
+      || COMBO_CHAINS[`Any_${currTag}`]
+      || null;
+}
+
+// Defensive_Defensive grants fatigueRecovery — a real effect that the scorer
+// ignored because it only ever looked for xMult/addChips. Surfaced here so the
+// round-advance step can apply it to energy.
+export function getChainFatigueRecovery(phaseId, pickedPhases, phaseIndex = null) {
+  const idx = phaseIndex === null ? pickedPhases.indexOf(phaseId) : phaseIndex;
+  if (idx <= 0) return 0;
+  const prev = ALL_PHASES.find(p => p.id === pickedPhases[idx - 1]);
+  const curr = ALL_PHASES.find(p => p.id === phaseId);
+  if (!prev || !curr) return 0;
+  const chain = lookupChain(prev.tag, curr.tag);
+  return chain && chain.effect === 'fatigueRecovery' ? chain.value : 0;
 }
 
 function getPhaseChainBonusChips(phaseId, pickedPhases, phaseIndex = null) {
@@ -416,8 +527,7 @@ function getPhaseChainBonusChips(phaseId, pickedPhases, phaseIndex = null) {
   const prevPhase = ALL_PHASES.find(p => p.id === prevPhaseId);
   const currPhase = ALL_PHASES.find(p => p.id === phaseId);
   if (!prevPhase || !currPhase) return 0;
-  const key = `${prevPhase.tag}_${currPhase.tag}`;
-  const chain = COMBO_CHAINS[key];
+  const chain = lookupChain(prevPhase.tag, currPhase.tag);
   if (chain && chain.effect === 'addChips') return chain.value;
   return 0;
 }
@@ -470,6 +580,13 @@ export function calculatePhaseScore(field, phaseId, state) {
   const roundTarget = match ? match.targets[state.roundIdx] : 1000;
   const phase = ALL_PHASES.find(p => p.id === phaseId);
 
+  // Persistent squad synergies are trait-count based, so they're known before
+  // any player is scored — resolve them first so their per-player multipliers
+  // can apply to the base chips below.
+  const squad = getSquad(state);
+  const squadSynergies = detectSquadSynergies(squad);
+  const manMarkedId = getManMarkedPlayerId(field, state);
+
   // Base player chips — only players in the phase's slots contribute.
   let playerChips = 0;
   const breakdown = [];
@@ -479,13 +596,22 @@ export function calculatePhaseScore(field, phaseId, state) {
     const baseChips = calculateChips(player, position);
     const oopMult = getPositionPenalty(player, position);
     const energyMult = getEnergyMultiplier(player.id, state);
-    const contrib = Math.round(baseChips * oopMult * energyMult);
+    // playerMult (by trait) and positionMult (by slot) from persistent squad
+    // synergies. Both were defined in data.js and never read — 11 synergies
+    // silently did nothing.
+    const squadMult = getPersistentPlayerMult(player, position, squadSynergies);
+    // man_mark: the opponent smothers your single best contributor.
+    const markMult = player.id === manMarkedId ? OPPONENT_TACTICS.man_mark.value : 1.0;
+    // An injured player is on the pitch but broken — contributes nothing.
+    const injuredMult = isInjured(player.id, state) ? 0 : 1;
+    const contrib = Math.round(baseChips * oopMult * energyMult * squadMult * markMult * injuredMult);
     playerChips += contrib;
-    breakdown.push({ player, position, baseChips, oopMult, energyMult, contrib });
+    breakdown.push({ player, position, baseChips, oopMult, energyMult, squadMult, markMult, contrib });
   }
 
-  // Synergies
-  const synergies = detectSynergies(field, state.formation);
+  // Synergies — gated by phase relevance, so the phase you pick matters.
+  const allSynergies = detectSynergies(field, state.formation);
+  const synergies = relevantSynergies(allSynergies, phaseId);
   let synergyChips = 0;
   let addMult = 1;
   let xMult = 1.0;
@@ -498,17 +624,14 @@ export function calculatePhaseScore(field, phaseId, state) {
     carryoverChips += syn.carryover || 0;
   }
 
-  // Squad persistent synergy effects applied to this phase
-  const squad = getSquad(state);
-  const squadSynergies = detectSquadSynergies(squad);
+  // Flat chip bonuses from persistent squad synergies.
   for (const ssyn of squadSynergies) {
     const eff = ssyn.effect;
     if (eff.addChips) {
-      // addChips for all
       if (eff.target === 'all') synergyChips += eff.addChips;
-      // addChips for target positions
       if (eff.targetPositions) {
         for (const entry of field) {
+          if (!phaseIncludesPosition(phase, entry.position)) continue;
           if (eff.targetPositions.includes(entry.position)) synergyChips += eff.addChips;
         }
       }
@@ -524,7 +647,13 @@ export function calculatePhaseScore(field, phaseId, state) {
     if (buff.type === 'addMultBuff') shopAddMultBuff += buff.value;
     if (buff.type === 'coachingBuff') shopChipsBuff += buff.value;
     if (buff.type === 'superSub') shopXMultBuff *= buff.value;
-    if (buff.type === 'formMult') shopXMultBuff *= (1 + buff.value);
+    // formMult stores a BONUS FRACTION (data.js: value 0.05 → x1.05), not a
+    // multiplier. Guard against a multiplier being passed by mistake, which
+    // would compound catastrophically across a campaign's worth of purchases.
+    if (buff.type === 'formMult') {
+      const frac = buff.value >= 1 ? buff.value - 1 : buff.value;
+      shopXMultBuff *= (1 + frac);
+    }
   }
 
   // Carryover from double_pivot
@@ -551,6 +680,11 @@ export function calculatePhaseScore(field, phaseId, state) {
     breakdown,
     synergies,
     squadSynergies,
+    // The chip subtotal before any multiplier. Exposed so the UI (and tests)
+    // can check that the previewed number equals what scoring actually used.
+    chips: totalChips,
+    addMult: addMult + shopAddMultBuff,
+    xMult: xMult * shopXMultBuff,
     carryoverNextPhase: carryoverChips,
     phaseMult,
     chainBonusChips,
@@ -571,25 +705,32 @@ export function estimatePhaseChips(field, phaseId, state) {
 
   const phase = ALL_PHASES.find(p => p.id === phaseId);
   let chips = 0;
+  // Must mirror calculatePhaseScore's chip stage exactly, or the number on the
+  // phase card doesn't match what the round actually pays.
+  const squadSyn = detectSquadSynergies(getSquad(state));
+  const markedId = getManMarkedPlayerId(field, state);
   for (const entry of field) {
     if (!phaseIncludesPosition(phase, entry.position)) continue;
     const { player, position } = entry;
     const base = calculateChips(player, position);
     const oop = getPositionPenalty(player, position);
     const eng = getEnergyMultiplier(player.id, state);
-    chips += Math.round(base * oop * eng);
+    const sq = getPersistentPlayerMult(player, position, squadSyn);
+    const mk = player.id === markedId ? OPPONENT_TACTICS.man_mark.value : 1.0;
+    chips += Math.round(base * oop * eng * sq * mk);
   }
 
-  for (const syn of detectSynergies(field, state.formation)) {
+  for (const syn of relevantSynergies(detectSynergies(field, state.formation), phaseId)) {
     chips += syn.chips || 0;
   }
 
-  for (const ssyn of detectSquadSynergies(getSquad(state))) {
+  for (const ssyn of squadSyn) {
     const eff = ssyn.effect;
     if (!eff.addChips) continue;
     if (eff.target === 'all') chips += eff.addChips;
     if (eff.targetPositions) {
       for (const entry of field) {
+        if (!phaseIncludesPosition(phase, entry.position)) continue;
         if (eff.targetPositions.includes(entry.position)) chips += eff.addChips;
       }
     }
@@ -658,6 +799,49 @@ export function finishPhase(phaseResult, state) {
     }
   }
 
+  // Defensive_Defensive chains grant fatigueRecovery — "rest while defending".
+  // The chain existed in COMBO_CHAINS but nothing ever read the effect, so
+  // back-to-back defensive phases gave no recovery at all.
+  const recovery = getChainFatigueRecovery(
+    phaseResult.phaseId, state.pickedPhases || [], phaseResult.phaseIndex
+  );
+  if (recovery > 0) {
+    // Energy is integral, but recovery is fractional (0.1 per player), so it
+    // banks across phases. Guarantee at least one pip whenever the chain fires:
+    // a recovery the player can't see is no better than the dead effect this
+    // replaced.
+    const banked = (newState._energyBank || 0) + recovery * (phaseResult.field || []).length;
+    const pips = Math.max(1, Math.floor(banked));
+    newState._energyBank = Math.max(0, banked - pips);
+    const energy = { ...newState.energy };
+    for (let i = 0; i < pips; i++) {
+      // restore the most-drained participant first
+      const cands = (phaseResult.field || [])
+        .map(e => e.player.id)
+        .filter(id => energy[id] && energy[id].current < energy[id].max)
+        .sort((a, b) => energy[a].current - energy[b].current);
+      if (!cands.length) break;
+      const id = cands[0];
+      energy[id] = { ...energy[id], current: energy[id].current + 1 };
+    }
+    newState.energy = energy;
+  }
+
+  // dirty_team: exhausted players risk an injury that costs them the rest of
+  // the match. Declared as target:'injury' in data.js and never implemented,
+  // so the final's signature threat did nothing.
+  const dirty = getOpponentTactics(state).find(t => t.target === 'injury');
+  if (dirty) {
+    const injured = [...(newState.injured || [])];
+    for (const entry of (phaseResult.field || [])) {
+      const e = newState.energy[entry.player.id];
+      if (!e || e.current > 0) continue;             // only exhausted players
+      if (injured.includes(entry.player.id)) continue;
+      if (Math.random() < dirty.value) injured.push(entry.player.id);
+    }
+    if (injured.length !== (newState.injured || []).length) newState.injured = injured;
+  }
+
   return newState;
 }
 
@@ -667,9 +851,23 @@ export function finishRound(state) {
   const target = match ? match.targets[state.roundIdx] : 1000;
   const roundWon = checkRoundWin(roundScore, target);
 
+  // Morale is the shop currency, and nothing ever paid it out — the player
+  // started with 10, spent it, and could never earn more, so the entire shop
+  // (and the progression it represents) was dead after the first couple of
+  // buys. Winning a round earns morale; overshooting the target earns a bonus,
+  // which is what makes a strong squad compound into later matches.
+  const overshoot = target > 0 ? roundScore / target : 0;
+  let moraleEarned = 0;
+  if (roundWon) {
+    moraleEarned = MORALE_PER_ROUND_WIN;
+    if (overshoot >= 1.5) moraleEarned += 1;
+    if (overshoot >= 2.5) moraleEarned += 1;
+  }
+
   const newState = {
     ...state,
-    roundResults: [...(state.roundResults || []), { roundIdx: state.roundIdx, score: roundScore, won: roundWon }],
+    morale: (state.morale || 0) + moraleEarned,
+    roundResults: [...(state.roundResults || []), { roundIdx: state.roundIdx, score: roundScore, won: roundWon, moraleEarned }],
     roundScore: 0,
     phaseResults: [],
     phaseIdx: 0,
@@ -678,6 +876,9 @@ export function finishRound(state) {
     shopBuffs: (state.shopBuffs || []).filter(buff => buff.type === 'formMult'),
     momentum: 1.0,
     _carryoverChips: 0,
+    // NOTE: `injured` deliberately survives finishRound. dirty_team is a
+    // match-long threat — losing a player for the rest of the tie is the point.
+    // It's cleared in finishMatch.
   };
 
   return { state: newState, roundWon, roundScore };
@@ -692,7 +893,11 @@ export function finishMatch(state) {
     matchResults: [...(state.matchResults || []), { matchIdx: state.matchIdx, won: matchWon, roundsWon }],
     roundResults: [],
     roundIdx: 0,
-    shopBuffs: [],
+    // Permanent upgrades (formMult) carry across matches — that's the squad
+    // progression the difficulty curve assumes. Consumables are spent.
+    shopBuffs: (state.shopBuffs || []).filter(b => b.type === 'formMult'),
+    injured: [],          // everyone patched up for the next match
+    _energyBank: 0,
   };
 
   if (!matchWon) {
@@ -719,6 +924,7 @@ export function resetRound(state) {
     dealtPhases: [],
     momentum: 1.0,
     _carryoverChips: 0,
+    // injuries persist within a match (see finishRound)
     roundIdx: (state.roundIdx || 0) + 1,
   };
 }
@@ -935,7 +1141,7 @@ export function getBuilderSynergyStatus(field, formationId) {
       available.push({
         id: syn.id,
         name: syn.name,
-        hint: syn.description.replace(/^[^:]*:\s*/, ''),
+        hint: describeEffect(syn),
       });
     }
   }
