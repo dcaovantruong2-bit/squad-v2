@@ -1,0 +1,88 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   THEME: FLOODLIGHT  (default)
+   Night match under stadium lights. Dark pitch-green stadium furniture, cream
+   matchday-programme paper for anything informational, warm orange club accent.
+
+   Derived from the 300 hex literals previously scattered across the screens,
+   collapsed to one shade per semantic role. Every value here is deliberate;
+   the near-duplicates it replaces (#73766d / #74766d / #74766e / #74776e) were
+   drift, not design.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+[data-theme="floodlight"] {
+  /* ── Ink: dark stadium surfaces, 900 deepest → 300 lightest ───────────── */
+  --ink-900: #080e0a;  /* page background, header/footer bars */
+  --ink-800: #111f17;  /* shell gradient top */
+  --ink-700: #172018;  /* raised dark surface */
+  --ink-600: #122219;  /* inset dark panel */
+  --ink-500: #29342d;  /* divider / subtle border */
+  --ink-400: #354139;  /* standard border on ink */
+  --ink-300: #4b5a50;  /* hover border on ink */
+
+  /* ── Paper: light programme surfaces ─────────────────────────────────── */
+  --paper-100: #d7d0bd;  /* primary paper (panels, sheets) */
+  --paper-200: #ddd6c4;  /* raised paper (cards on paper) */
+  --paper-300: #e5dfd0;  /* input field on paper */
+  --paper-400: #eee7d7;  /* brightest paper / highlight */
+  --paper-line: #aaa596; /* rule / border on paper */
+
+  /* ── Text ────────────────────────────────────────────────────────────── */
+  --fg:            #eee6d6;  /* primary text on ink */
+  --fg-dim:        #8b9a90;  /* secondary text on ink */
+  --fg-muted:      #6f7d74;  /* tertiary / disabled on ink */
+  --on-paper:      #292b27;  /* primary text on paper */
+  --on-paper-dim:  #666960;  /* secondary text on paper */
+  --on-paper-muted:#77796f;  /* tertiary text on paper */
+  --on-accent:     #171a16;  /* text on accent fill */
+
+  /* ── Accent: club colour ─────────────────────────────────────────────── */
+  --accent:        #e87c42;
+  --accent-strong: #d37a45;
+  --accent-soft:   #e9a85d;
+  --accent-glow:   rgba(232, 124, 66, 0.35);
+
+  /* ── Semantic state ──────────────────────────────────────────────────── */
+  --ok:        #6cc080;  /* success, target met, natural fit */
+  --ok-strong: #39774b;
+  --ok-soft:   #92c79e;
+  --warn:      #e5aa54;  /* caution, adjacent fit, low budget */
+  --warn-soft: #f1bd57;
+  --bad:       #ef5d61;  /* failure, over budget, punished */
+  --bad-strong:#b44a42;
+  --info:      #66bce9;  /* neutral information */
+  --rare:      #ad83d7;  /* rare / legendary emphasis */
+
+  /* ── Print: ink colours for text/rules ON paper surfaces ─────────────
+     The matchday-programme look uses a muted brick red for kickers and section
+     headings — too desaturated to be --bad (which must read as failure) and too
+     dark to be --accent. It is its own role: printed ink on newsprint. */
+  --print-red:      #8d4139;  /* kicker / heading ink on paper */
+  --print-red-deep: #7a3034;  /* filled brick-red chip on paper */
+  --print-brown:    #8a5c3f;  /* secondary printed ink */
+
+  /* ── Pitch ───────────────────────────────────────────────────────────── */
+  --pitch-deep:  #122219;  /* dark pitch inset (panels) */
+  --pitch-mid:   #17301f;  /* mid pitch */
+  --pitch-turf:  #28583a;  /* lit playing surface — the actual grass */
+  --pitch-turf-2:#234d31;  /* alternate mow stripe / smaller boards */
+  --pitch-line:  rgba(238, 230, 214, 0.22);  /* faint markings */
+  --pitch-line-strong: rgba(240, 243, 226, 0.50); /* pitch perimeter / boards */
+  --pitch-glow:  rgba(84, 126, 91, 0.28);    /* floodlight bloom on grass */
+  --pitch-glow-soft: rgba(68, 126, 82, 0.12);
+
+  /* ── Translucent overlays ────────────────────────────────────────────
+     Alpha values must be tokens too, or a redesign leaves the old theme's
+     tint bleeding through every scrim and gradient. */
+  --scrim-dark:   rgba(6, 12, 8, 0.80);      /* modal / sheet backdrop */
+  --scrim-darker: rgba(3, 8, 5, 0.90);       /* full-screen takeover */
+  --paper-grain:  rgba(50, 55, 48, 0.06);    /* newsprint texture on paper */
+  --paper-tint:   rgba(77, 80, 73, 0.18);    /* subtle fill on paper */
+  --accent-tint:  rgba(232, 124, 66, 0.12);  /* accent wash */
+  --bad-tint:     rgba(181, 75, 65, 0.10);
+  --ok-tint:      rgba(76, 132, 89, 0.25);
+
+  /* ── Energy / fatigue ramp ───────────────────────────────────────────── */
+  --energy-full: var(--ok);
+  --energy-mid:  var(--warn);
+  --energy-low:  var(--bad);
+}

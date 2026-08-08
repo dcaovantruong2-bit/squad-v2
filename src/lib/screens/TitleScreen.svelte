@@ -67,7 +67,7 @@
 
 <style>
   .title-screen {
-    background: var(--bg-deep);
+    background: var(--ink-900);
     align-items: center;
     gap: 0;
     overflow: hidden;
@@ -83,7 +83,7 @@
     font-family: var(--font-display);
     font-size: 3rem;
     color: var(--accent);
-    text-shadow: 0 0 30px var(--accent-glow), 0 0 60px rgba(57,255,20,0.15);
+    text-shadow: 0 0 30px var(--accent-glow), 0 0 60px var(--pitch-line);
     letter-spacing: 0.15em;
     line-height: 1;
     margin-bottom: 10px;
@@ -91,13 +91,13 @@
   .subtitle {
     font-family: var(--font-display);
     font-size: 0.55rem;
-    color: var(--gold);
+    color: var(--warn-soft);
     letter-spacing: 0.2em;
     margin-bottom: 12px;
   }
   .tagline {
     font-size: 1.1rem;
-    color: var(--muted);
+    color: var(--fg-muted);
     font-style: italic;
   }
 
@@ -107,7 +107,7 @@
     max-width: 360px;
     height: 160px;
     margin: 20px 0;
-    background: var(--pitch-green);
+    background: var(--pitch-deep);
     border-radius: var(--r-lg);
     border: 1px solid var(--pitch-line);
     overflow: hidden;
@@ -144,8 +144,8 @@
 
   .best-run {
     display: flex; gap: 12px; align-items: center;
-    background: var(--surface);
-    border: 1px solid var(--border);
+    background: var(--ink-700);
+    border: 1px solid var(--ink-400);
     border-radius: var(--r-sm);
     padding: 8px 16px;
     margin-bottom: 20px;
@@ -154,14 +154,14 @@
   .best-run .label {
     font-family: var(--font-display);
     font-size: 0.48rem;
-    color: var(--gold);
+    color: var(--warn-soft);
   }
   .best-run .val { font-size: 1rem; color: var(--fg-dim); }
 
   .campaign-preview {
     width: 100%; max-width: 360px;
-    background: var(--surface);
-    border: 1px solid var(--border);
+    background: var(--ink-700);
+    border: 1px solid var(--ink-400);
     border-radius: var(--r-md);
     padding: 12px 16px;
     margin-bottom: 20px;
@@ -169,7 +169,7 @@
   .preview-title {
     font-family: var(--font-display);
     font-size: 0.5rem;
-    color: var(--muted);
+    color: var(--fg-muted);
     letter-spacing: 0.15em;
     line-height: 1.9;
     padding-top: 4px;
@@ -188,11 +188,11 @@
     flex-shrink: 0;
   }
   .match-name { color: var(--fg); flex: 1; }
-  .match-opp { color: var(--muted); font-size: 0.85rem; }
+  .match-opp { color: var(--fg-muted); font-size: 0.85rem; }
 
   .footer-note {
     font-size: 0.85rem;
-    color: var(--border-bright);
+    color: var(--ink-300);
     text-align: center;
     padding-bottom: 20px;
     margin-top: auto;

@@ -8,17 +8,17 @@
   export let energyLevel = 3; // 3=full, 2=tired, 1=drained, 0=exhausted
 
   const POS_COLORS = {
-    GK: '#f59e0b', CB: '#3b82f6', FB: '#60a5fa',
-    CDM: '#8b5cf6', CM: '#a78bfa', CAM: '#ec4899',
-    LW: '#10b981', RW: '#10b981', ST: '#ef4444'
+    GK: 'var(--warn)', CB: 'var(--info)', FB: 'var(--info)',
+    CDM: 'var(--rare)', CM: 'var(--rare)', CAM: 'var(--rare)',
+    LW: 'var(--ok)', RW: 'var(--ok)', ST: 'var(--bad)'
   };
 
   const STAT_COLORS = {
-    atk: '#ef4444', // red
-    pac: '#10b981', // green
-    pas: '#3b82f6', // blue
-    def_: '#8b5cf6', // purple
-    spc: '#f59e0b'  // amber
+    atk: 'var(--bad)', // red
+    pac: 'var(--ok)', // green
+    pas: 'var(--info)', // blue
+    def_: 'var(--rare)', // purple
+    spc: 'var(--warn)'  // amber
   };
 
   const TRAIT_LABELS = {
@@ -27,7 +27,7 @@
     leader:'★', journeyman:'🎒'
   };
 
-  $: posColor = POS_COLORS[player.position] || '#aaa';
+  $: posColor = POS_COLORS[player.position] || 'var(--paper-line)';
 
   // Stat pips 1–10
   function pips(val) {
@@ -44,10 +44,10 @@
 
   $: cost = player.atk + player.pac + player.pas + player.def_ + player.spc;
 
-  $: energyColor = energyLevel === 3 ? '#39ff14'
-    : energyLevel === 2 ? '#ffd700'
-    : energyLevel === 1 ? '#ff8c00'
-    : '#ff3344';
+  $: energyColor = energyLevel === 3 ? 'var(--ok)'
+    : energyLevel === 2 ? 'var(--warn-soft)'
+    : energyLevel === 1 ? 'var(--accent)'
+    : 'var(--bad)';
   $: energyLabel = energyLevel === 3 ? 'FRESH'
     : energyLevel === 2 ? 'TIRED'
     : energyLevel === 1 ? 'LOW'
@@ -118,8 +118,8 @@
 
 <style>
   .player-card {
-    background: var(--surface);
-    border: 1.5px solid var(--border);
+    background: var(--ink-700);
+    border: 1.5px solid var(--ink-400);
     border-radius: var(--r-md);
     padding: 12px;
     transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
@@ -127,7 +127,7 @@
   }
   .player-card.clickable { cursor: pointer; }
   .player-card.clickable:hover {
-    border-color: var(--border-bright);
+    border-color: var(--ink-300);
     transform: translateY(-2px);
   }
   .player-card.selected {
@@ -145,14 +145,14 @@
     font-size: 0.5rem;
     padding: 3px 6px;
     border-radius: 4px;
-    color: #000;
+    color: var(--on-accent);
     font-weight: bold;
     flex-shrink: 0;
   }
   .player-name {
     font-family: var(--font-body);
     font-size: 1.15rem;
-    color: var(--gold);
+    color: var(--warn-soft);
     flex: 1;
     white-space: nowrap;
     overflow: hidden;
@@ -164,17 +164,17 @@
   .stat-label {
     font-family: var(--font-display);
     font-size: 0.48rem;
-    color: var(--muted);
+    color: var(--fg-muted);
     width: 28px;
     flex-shrink: 0;
   }
   .pips { display: flex; gap: 2px; flex: 1; }
   .pip {
     width: 12px; height: 8px; border-radius: 2px;
-    background: var(--surface-raised);
+    background: var(--ink-600);
   }
-  .pip.filled { background: var(--accent-dim); }
-  .pip.filled.high { background: var(--gold); }
+  .pip.filled { background: var(--accent-strong); }
+  .pip.filled.high { background: var(--warn-soft); }
   .stat-val {
     font-family: var(--font-display);
     font-size: 0.55rem;
@@ -186,8 +186,8 @@
   .traits { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
   .trait-badge {
     font-size: 0.8rem;
-    background: var(--surface-raised);
-    border: 1px solid var(--border);
+    background: var(--ink-600);
+    border: 1px solid var(--ink-400);
     border-radius: 4px;
     padding: 1px 6px;
     color: var(--fg-dim);
@@ -195,7 +195,7 @@
 
   .desc {
     font-size: 0.9rem;
-    color: var(--muted);
+    color: var(--fg-muted);
     font-style: italic;
     margin-bottom: 8px;
   }
@@ -203,13 +203,13 @@
   .card-footer {
     display: flex; align-items: center; justify-content: space-between;
     padding-top: 8px;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--ink-400);
     gap: 8px;
   }
   .cost {
     font-family: var(--font-display);
     font-size: 0.5rem;
-    color: var(--muted);
+    color: var(--fg-muted);
   }
   .energy-badge {
     font-family: var(--font-display);
@@ -224,13 +224,13 @@
     font-family: var(--font-body);
     font-size: 1rem;
     background: transparent;
-    border: 1px solid var(--danger);
-    color: var(--danger);
+    border: 1px solid var(--bad);
+    color: var(--bad);
     padding: 2px 7px;
     border-radius: 4px;
     cursor: pointer;
     line-height: 1;
     transition: background 0.15s;
   }
-  .remove-btn:hover { background: var(--danger); color: #fff; }
+  .remove-btn:hover { background: var(--bad); color: var(--paper-400); }
 </style>

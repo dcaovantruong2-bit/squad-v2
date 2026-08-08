@@ -1,0 +1,74 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   THEME: SUNDAY MORNING
+   Cold Sunday-league daylight. Overcast grey-blue instead of stadium black,
+   washed grass, muddy red accent. Deliberately unglamorous — the opposite end
+   of the mood range from FLOODLIGHT.
+
+   Exists to PROVE the token contract: this file overrides values only. If a
+   screen still shows a floodlight colour under this theme, that screen has a
+   hardcoded hex and the contract is leaking. tools/theme-lint.mjs enforces it.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+[data-theme="sundaymorning"] {
+  --ink-900: #1b2026;
+  --ink-800: #232a32;
+  --ink-700: #2b333c;
+  --ink-600: #202832;
+  --ink-500: #37414c;
+  --ink-400: #45515e;
+  --ink-300: #5b6875;
+
+  --paper-100: #cfcdc6;
+  --paper-200: #d9d7d0;
+  --paper-300: #e3e1da;
+  --paper-400: #eeece6;
+  --paper-line: #a5a49d;
+
+  --fg:            #e8ebee;
+  --fg-dim:        #93a0ab;
+  --fg-muted:      #6f7c88;
+  --on-paper:      #24272b;
+  --on-paper-dim:  #5f6469;
+  --on-paper-muted:#7b8085;
+  --on-accent:     #f4f2ee;
+
+  --accent:        #8c3b32;
+  --accent-strong: #6f2e26;
+  --accent-soft:   #b4655a;
+  --accent-glow:   rgba(140, 59, 50, 0.35);
+
+  --ok:        #7fa86b;
+  --ok-strong: #4d6b40;
+  --ok-soft:   #a6c294;
+  --warn:      #c9973f;
+  --warn-soft: #dbb063;
+  --bad:       #c4544e;
+  --bad-strong:#8e3b36;
+  --info:      #6f9cb8;
+  --rare:      #8f7fa8;
+
+  --print-red:      #6d4a44;
+  --print-red-deep: #543532;
+  --print-brown:    #6b5647;
+
+  --pitch-deep:  #2c3a2c;
+  --pitch-mid:   #3a4b38;
+  --pitch-turf:  #4a6344;  /* washed-out winter grass, not lush */
+  --pitch-turf-2:#415639;
+  --pitch-line:  rgba(232, 235, 238, 0.20);
+  --pitch-line-strong: rgba(238, 240, 243, 0.42);
+  --pitch-glow:  rgba(120, 140, 120, 0.20);
+  --pitch-glow-soft: rgba(110, 130, 110, 0.10);
+
+  --scrim-dark:   rgba(16, 20, 25, 0.80);
+  --scrim-darker: rgba(10, 13, 17, 0.90);
+  --paper-grain:  rgba(48, 50, 54, 0.07);
+  --paper-tint:   rgba(74, 78, 82, 0.18);
+  --accent-tint:  rgba(140, 59, 50, 0.12);
+  --bad-tint:     rgba(142, 59, 54, 0.10);
+  --ok-tint:      rgba(96, 130, 82, 0.25);
+
+  --energy-full: var(--ok);
+  --energy-mid:  var(--warn);
+  --energy-low:  var(--bad);
+}

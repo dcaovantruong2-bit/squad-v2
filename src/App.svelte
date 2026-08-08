@@ -43,7 +43,7 @@
     {:else}
       <!-- Placeholder for future screens -->
       <div class="screen" style="justify-content:center;align-items:center;gap:16px;">
-        <p style="font-family:var(--font-display);font-size:0.7rem;color:var(--muted);">
+        <p style="font-family:var(--font-display);font-size:0.7rem;color:var(--fg-muted);">
           Screen: {$screen}
         </p>
         <button class="btn-secondary" on:click={() => screen.set('title')}>← Back to Title</button>
@@ -66,11 +66,11 @@
     position: fixed; right: 14px; bottom: 92px; z-index: 999;
     width: 42px; height: 42px; padding: 0;
     display: grid; place-items: center;
-    background: rgba(8, 14, 10, 0.82); border: 1px solid #354139;
+    background: var(--scrim-dark); border: 1px solid var(--ink-400);
     font-size: 1.05rem; border-radius: 50%;
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
   }
-  .sound-toggle:hover { border-color: #6b7c71; }
+  .sound-toggle:hover { border-color: var(--fg-muted); }
   .sound-toggle.muted { opacity: 0.55; }
   /* Hide the toggle while the lineup sheet is open so it doesn't float over it. */
   .route-view:has(:global(.swap-sheet)) + .sound-toggle { display: none; }

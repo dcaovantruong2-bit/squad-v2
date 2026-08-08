@@ -1,0 +1,178 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323:wght@400&display=swap');
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SQUAD — THEME TOKEN CONTRACT
+   ───────────────────────────────────────────────────────────────────────────
+   This file is the ONLY place raw colour values belong. Screens must reference
+   var(--token) exclusively — never a hex literal. That constraint is what
+   makes a full visual redesign a one-file job instead of a 128KB CSS edit.
+
+   To redesign: copy themes/retro.css, change the values, register it in
+   theme.js. Do not add tokens per-screen; add them here so every theme is
+   forced to answer for them.
+
+   Naming: --<role>-<weight>, weight ascending = lighter.
+     ink    → dark stadium surfaces (backgrounds, bars, borders)
+     paper  → light programme surfaces (cards, sheets, overlays)
+     fg     → text ON ink        |  on-paper → text ON paper
+     accent → club colour (primary action)
+     ok/warn/bad/info/rare → semantic state
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Type ──────────────────────────────────────────────────────────────── */
+  --font-display: 'Press Start 2P', monospace;
+  --font-body:    'VT323', monospace;
+
+  /* Display font is a pixel face: it renders legibly only at exact multiples.
+     Screens previously used .22rem–.34rem literals, which is 3.5px–5.4px and
+     effectively unreadable. These steps are the sanctioned floor. */
+  --t-micro:  0.5rem;   /* 8px  — smallest legible pixel-font size */
+  --t-label:  0.5625rem;/* 9px  — kickers, table headers */
+  --t-sm:     0.6875rem;/* 11px */
+  --t-md:     0.8125rem;/* 13px */
+  --t-lg:     1.125rem; /* 18px */
+  --t-xl:     1.5rem;   /* 24px */
+  --t-2xl:    2rem;     /* 32px */
+
+  /* ── Geometry ──────────────────────────────────────────────────────────── */
+  --r-sm: 2px;
+  --r-md: 4px;
+  --r-lg: 8px;
+  --bar-h:    84px;  /* header height */
+  --footer-h: 78px;  /* fixed footer height */
+
+  /* ── Motion ────────────────────────────────────────────────────────────── */
+  --dur-fast: 0.12s;
+  --dur-med:  0.24s;
+  --dur-slow: 0.4s;
+
+  /* ── Elevation ─────────────────────────────────────────────────────────── */
+  --shadow-card:  4px 5px 0 rgba(0, 0, 0, 0.22);
+  --shadow-panel: 8px 10px 0 rgba(0, 0, 0, 0.20);
+  --shadow-float: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+/* Reset + element defaults live here so themes never need to restate them. */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* The rem BASE must stay 16px: every screen sizes type in rem, so changing the
+   root font-size silently rescales the entire UI. Set body type separately. */
+html { font-size: 16px; }
+
+html, body {
+  /* dvh: on mobile Safari/Chrome 100vh includes the retracted URL bar, so a
+     100vh shell overflows by the toolbar height and the footer sits offscreen.
+     dvh tracks the *visible* viewport. vh kept as the fallback for old engines. */
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--ink-900);
+  color: var(--fg);
+  font-family: var(--font-body);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+body { font-size: 1.1rem; }
+
+/* Screens opt into locked scrolling with class="no-scroll" on their own root
+   rather than mutating :global(body) — a :global(body){overflow:hidden} in a
+   screen's <style> stays applied after Svelte swaps that screen out, which is
+   why scrolling silently died on later routes. */
+body.no-scroll { overflow: hidden; }
+
+#app { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+
+h1, h2, h3 { font-family: var(--font-display); letter-spacing: 0.04em; }
+
+button {
+  font-family: var(--font-display);
+  font-size: var(--t-sm);
+  cursor: pointer;
+  border: none;
+  border-radius: var(--r-sm);
+  padding: 10px 18px;
+  transition: transform var(--dur-fast), box-shadow var(--dur-fast);
+}
+button:active { transform: scale(0.97); }
+button:disabled { cursor: not-allowed; }
+
+/* Visible keyboard focus — previously absent everywhere, which made the game
+   unusable without a mouse and fails WCAG 2.4.7. */
+:where(button, [role="button"], a, input, select, textarea):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Shared layout/component classes. These are consumed by screen markup
+   (.screen 22×, .card 43×, .badge 16×, .btn-* 4×) so they must live globally —
+   Svelte would tree-shake them out of a component's scoped <style>.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.screen {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+}
+@media (min-width: 600px) {
+  .screen { padding: 32px 24px; max-width: 520px; margin: 0 auto; width: 100%; }
+}
+
+.card {
+  background: var(--ink-700);
+  border: 1px solid var(--ink-400);
+  border-radius: var(--r-md);
+  padding: 14px;
+  transition: border-color var(--dur-med), box-shadow var(--dur-med);
+}
+.card:hover { border-color: var(--ink-300); }
+.card.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 10px var(--accent-glow);
+}
+
+.badge {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-size: var(--t-micro);
+  padding: 3px 8px;
+  border-radius: var(--r-md);
+  letter-spacing: 0.05em;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+.btn-primary:hover { box-shadow: 0 0 22px var(--accent-glow); }
+
+.btn-secondary {
+  background: var(--ink-600);
+  color: var(--fg);
+  border: 1px solid var(--ink-300);
+}
+.btn-secondary:hover { background: var(--ink-500); }
+
+.btn-danger {
+  background: var(--bad);
+  color: var(--paper-400);
+  box-shadow: 0 0 10px var(--bad-tint);
+}
+
+.glow-text { text-shadow: 0 0 12px var(--accent-glow); color: var(--accent); }
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--ink-800); }
+::-webkit-scrollbar-thumb { background: var(--ink-400); border-radius: 3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
