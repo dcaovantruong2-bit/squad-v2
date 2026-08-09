@@ -55,6 +55,9 @@
 
   let overlaySlot = null;
   $: overlayEntry = overlaySlot != null ? ($game.field || [])[overlaySlot] : null;
+  // Whether the open slot is still unpicked — the incumbent's row then acts as
+  // "keep them", confirming the pick instead of dismissing.
+  $: slotPicked = overlaySlot != null && pickedSet.has(overlaySlot);
 
   $: candidates = (() => {
     if (!overlayEntry || !current) return [];
@@ -249,12 +252,12 @@
             type="button"
             class="swap-row"
             class:current={c.isCurrent}
-            on:click={() => c.isCurrent ? (overlaySlot = null) : onSwap(c.player.id)}
+            on:click={() => onSwap(c.player.id)}
           >
             <span class="row-fit" style={`--fit-color:${fitColor(c)}`}>{fitLabel(c)}</span>
             <div class="row-name">
               <strong>{c.player.name}</strong>
-              <small>{c.player.position}{c.isCurrent ? ' · PLAYING HERE' : ''} · ⚡ {c.energy}/3</small>
+              <small>{c.player.position}{c.isCurrent ? (slotPicked ? ' · PLAYING HERE' : ' · TAP TO KEEP') : ''} · ⚡ {c.energy}/3</small>
             </div>
             <div class="row-contrib">
               {#if c.contrib > 0}
