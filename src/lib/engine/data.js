@@ -175,6 +175,22 @@ export const ALL_PHASES = [
   { id:"set_piece",       name:"Set Piece",     tag:"Specialist",  weight:"SPC", slots:["CAM","CB","ST"], desc:"Dead ball specialist - aerial threat" },
 ];
 
+// Phase shapes — where contributing players stand when a phase is live (UI only).
+// Pitch space: x 0-100 (left→right), y 0-100 (attack→own goal), matching
+// FORMATIONS.pitchLayout. Each position maps to ordered coordinates; the k-th
+// player of that position in formation slot order uses entry k. The engine
+// never reads this — the match screen uses it to arrange the phase-shaped pitch.
+export const PHASE_SHAPES = {
+  goal_kick:       { GK: [[50, 90]],                    CB: [[34, 76], [66, 76], [50, 72]] },
+  build_up:        { FB: [[8, 66], [92, 66]],           CM: [[36, 54], [64, 54], [50, 50]] },
+  wide_attack:     { FB: [[10, 62], [90, 62]],          LW: [[12, 30]],          RW: [[88, 30]] },
+  direct_play:     { LW: [[14, 32]], RW: [[86, 32]],    ST: [[50, 20], [58, 27]], CM: [[36, 50], [64, 50], [50, 44]] },
+  defensive_block: { CB: [[34, 76], [66, 76], [50, 80]], CDM: [[42, 64], [58, 64]] },
+  tiki_taka:       { CM: [[34, 52], [66, 52], [50, 46]], CAM: [[50, 40]] },
+  counter:         { LW: [[12, 26]], RW: [[88, 26]],    ST: [[44, 14], [56, 22]] },
+  set_piece:       { CAM: [[50, 46]], CB: [[42, 26], [58, 26], [50, 34]], ST: [[44, 16], [56, 16]] },
+};
+
 // Human-readable requirement + reward, GENERATED from the trigger and effect
 // objects rather than hand-written. Every hand-written `description` in this
 // file disagreed with its own numbers (30 mismatches: "+15 mult each" on an
