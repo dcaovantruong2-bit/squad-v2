@@ -62,6 +62,10 @@ export const sfx = {
     tone(494, { dur: 0.08, type: 'triangle', vol: 0.06, when: 0.07 });
     tone(659, { dur: 0.16, type: 'triangle', vol: 0.06, when: 0.14 });
   },
+  land()     { // impact thud — score lands, low thump + tick
+    tone(150, { dur: 0.1, type: 'sine', vol: 0.09, slide: -80 });
+    tone(300, { dur: 0.06, type: 'triangle', vol: 0.05, when: 0.01, slide: -120 });
+  },
   win()      { [523, 659, 784, 1047].forEach((f, i) => tone(f, { dur: 0.14, type: 'triangle', vol: 0.055, when: i * 0.09 })); },
   lose()     { [392, 330, 262, 196].forEach((f, i) => tone(f, { dur: 0.16, type: 'sawtooth', vol: 0.04, when: i * 0.12 })); },
   buy()      { tone(880, { dur: 0.06, type: 'square', vol: 0.035 }); tone(1175, { dur: 0.09, type: 'square', vol: 0.035, when: 0.06 }); },
