@@ -293,8 +293,26 @@ export function unpickPhase(slotIndex) {
 
 export function confirmPhases() {
   sfx.kickoff();
-  game.update(g => ({ ...g, phaseIdx: 0, phaseResults: [], roundScore: 0 }));
+  game.update(g => ({ ...g, phaseIdx: 0, phaseResults: [], roundScore: 0, phasePickedSlots: [] }));
   screen.set('match');
+}
+
+// Match-time phase lineup: pick who plays a phase slot. The swap keeps the XI a
+// complete permutation (positions stay tied to slots); the slot then counts as
+// picked for the current phase. Unpicked players rest — no score, no drain.
+export function setPhasePick(slotIndex, playerId) {
+  sfx.pick();
+  game.update(g => {
+    const field = g.field || [];
+    const slot = field[slotIndex];
+    if (!slot) return g;
+    const fromIdx = field.findIndex(e => e.player.id === playerId);
+    if (fromIdx === -1) return g;
+    const field2 = fromIdx === slotIndex ? field : swapFieldEntries(field, slotIndex, fromIdx);
+    const picked = [...(g.phasePickedSlots || [])];
+    if (!picked.includes(slotIndex)) picked.push(slotIndex);
+    return { ...g, field: field2, phasePickedSlots: picked };
+  });
 }
 
 // Match-time lineup: swap which of the 11 fills a slot (positions stay tied to
@@ -336,6 +354,8 @@ export function continueAfterPhase() {
     settleRound();
     screen.set('round-result');
   } else {
+    // Next phase kicks off with an empty lineup — the player picks who plays it.
+    game.update(g => ({ ...g, phasePickedSlots: [] }));
     screen.set('match');
   }
 }

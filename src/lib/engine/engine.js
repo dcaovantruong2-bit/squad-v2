@@ -22,6 +22,9 @@ export function createGameState() {
     phaseIdx: 0,
     dealtPhases: [],
     pickedPhases: [],
+    // Match-time phase lineups: slot indices the player has actively picked
+    // for the CURRENT phase. Cleared when the phase (or round) changes.
+    phasePickedSlots: [],
     field: [],
     roundScore: 0,
     phaseResults: [],
@@ -873,6 +876,7 @@ export function finishRound(state) {
     phaseIdx: 0,
     pickedPhases: [],
     dealtPhases: [],
+    phasePickedSlots: [],
     shopBuffs: (state.shopBuffs || []).filter(buff => buff.type === 'formMult'),
     momentum: 1.0,
     _carryoverChips: 0,
